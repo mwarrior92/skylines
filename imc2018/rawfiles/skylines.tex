@@ -109,9 +109,69 @@ October 31--November 2, 2018}
 
 \maketitle
 
-\section{Introduction} \label{sect:intro}
+\section{Background \& Motivation} \label{sect:background}
+\begin{enumerate}
+    \item site performance is dependent on many underlying content sources
+        \begin{enumerate}
+            \item for Alexa top 500: 50+ domain resolutions per site in median case, 100+ in 80th
+                percentile \cite{dnssly}
+            \item providers are concerned with the ``bottlenecks'' induced by
+                poorly optimized external services (TODO: citations)
+            \item providers are interested in coalescing connections where
+                possible (TODO: citations; spdy, quic)
+        \end{enumerate}
+    \item existing measurement and optization efforts tend to focus on
+        individual services, often neglecting the complexity of page load times
+        and likelihood of external bottlenecks
+        \begin{enumerate}
+            \item (CDN) resource allocation and mapping algorithm / analysis (TODO: cite
+                examples)
+            \item client location algorithms and analysis (TODO: cite examples)
+        \end{enumerate}
+\end{enumerate}
 
-bla bla
+\section{Overview / Goal}
+Given that no provider is an island (see \ref{sect:background}), we need to know
+how client to sever mapping schemes work \emph{together}, across providers.
+
+Potential applications and insights:
+\begin{enumerate}
+    \item services may be able to make better decisions about how to allocate
+        and/or share infrastructure with other providers
+    \item services can better identify potential external sources of outlier behavior
+    \item researchers can make more informed decisions in large scale internet
+        experiment design and analysis (particularly regarding client grouping)
+\end{enumerate}
+
+\section{Approach}
+\begin{enumerate}
+    \item we DNS resolution to determine mapping schemes, as DNS redirection is
+        both widely used and publicly exposed
+        \begin{enumerate}
+            \item we first identify sites that use DNS redirection 
+            \item we then determine the granularity with which sites use DNS
+                redirection.
+                \begin{enumerate}
+                    \item if a site has few unique IPs, it may be using anycast,
+                        in which case the details of their mapping scheme is
+                        potentially unexposed to the public 
+                    \item alternatively, a service with few IPs might actually
+                        have few resource locations. There
+                        is not much to analyze regarding such a service in the
+                        context of this paper, as such a small distribution
+                        would inherently have very little overlap with any
+                        large scale mapping schemes.
+                \end{enumerate}
+            \item next, we extract general properties and patterns from the
+                remaining, sufficiently granular dataset. We'll use these
+                findings to form our distance measure, which will drive the rest
+                of our analysis
+        \end{enumerate}
+    \item we form a distance measure, describing the degree of similarity
+        between two clients in terms of the set of web resources they are
+        exposed to (in the context of DNS redirection)
+    \item ...
+\end{enumerate}
 
 \clearpage
 
