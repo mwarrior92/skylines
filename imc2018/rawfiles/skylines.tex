@@ -118,16 +118,17 @@ October 31--November 2, 2018}
             \item providers are concerned with the ``bottlenecks'' induced by
                 poorly optimized external services (TODO: citations)
             \item providers are interested in coalescing connections where
-                possible (TODO: citations; spdy, quic)
+                possible \cite{howspdy} (TODO: citations; spdy, quic)
         \end{enumerate}
     \item existing measurement and optization efforts tend to focus on
         individual services, often neglecting the complexity of page load times
         and likelihood of external bottlenecks
         \begin{enumerate}
-            \item (CDN) resource allocation and mapping algorithm / analysis (TODO: cite
-                examples)
-            \item client location algorithms and analysis (TODO: cite examples)
+            \item (CDN) resource allocation and mapping algorithm / coverage / analysis (TODO: cite
+                examples) \cite{akmapping, gmapping, cartography}
         \end{enumerate}
+    \item it's not currently very clear just how varied online experience is for
+        clients in terms of resource allocation
 \end{enumerate}
 
 \section{Overview / Goal}
@@ -158,19 +159,35 @@ Potential applications and insights:
                     \item alternatively, a service with few IPs might actually
                         have few resource locations. There
                         is not much to analyze regarding such a service in the
-                        context of this paper, as such a small distribution
-                        would inherently have very little overlap with any
-                        large scale mapping schemes.
+                        context of this paper.
                 \end{enumerate}
             \item next, we extract general properties and patterns from the
                 remaining, sufficiently granular dataset. We'll use these
                 findings to form our distance measure, which will drive the rest
                 of our analysis
         \end{enumerate}
-    \item we form a distance measure, describing the degree of similarity
+    \item we introduce a new distance measure -- skyline distance, given in units of
+        ``blocks'' -- that describes the degree of similarity
         between two clients in terms of the set of web resources they are
-        exposed to (in the context of DNS redirection)
-    \item ...
+        exposed to (in the context of DNS redirection). It will be fundamentally
+        based in jaccard similarity. 
+        \begin{enumerate}
+            \item what sites / types of sites follow similar / significantly
+                overlapping mapping patterns?
+            \item what clients are exposed to similar resource selections across
+                services? 
+            \item Does high similarity (low ``distance'') between clients
+                correllate well with or reveal any other properties (location, prefix,
+                etc)?
+            \item are there any surprising or apparently anomalous / erroneous
+                patterns? (for example, clients that are apparently close in the
+                network being directed to very different resources, or clients
+                that are apparently far in the network being directed to the
+                same resources) 
+            \item do the patterns differ with edns?
+            \item can we predict which client pairs will have close/far distance
+                measures? 
+        \end{enumerate}
 \end{enumerate}
 
 \clearpage

@@ -107,10 +107,13 @@ def domain_overlap():
     dom_ans_sets = dict()
     dom_ans_counts = dict()
     x = list()
+    xpd = list()  # median per domain
     for mg in mg4:
         dom_ans_sets[mg['domain']] = set.union(*[set(z) for z in mg['answers']])
         dom_ans_counts[mg['domain']] = numpy.mean([len(z) for z in mg['answers']])
-        x += [len(z) for z in mg['answers']]
+        tmp = [len(z) for z in mg['answers']]
+        x += tmp
+        xpd.append(numpy.ceil(numpy.median(tmp)))
 
     with open(data_dir+"dom_ans_counts.json", "w+") as f:
         json.dump(dom_ans_counts, f)
@@ -124,6 +127,15 @@ def domain_overlap():
     ax[1].set_xlim([0, 15])
     ax[1].set_xlabel("# DNS A answers for single query")
     fig.savefig(data_dir+'ans_count.png')
+    plt.close(fig)
+
+    # plot median # of IPs per answer for each domain
+    fig, ax = plt.subplots()
+    ecdf = ECDF(xpd)
+    ax.plot(list(ecdf.x), list(ecdf.y))
+    ax.set_xlim([0, 15])
+    ax.set_xlabel("median # DNS A answers per query")
+    fig.savefig(data_dir + 'ans_count_per_domain.png')
     plt.close(fig)
 
     # plot number of distinct answers per domain
