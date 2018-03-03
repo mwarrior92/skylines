@@ -6,8 +6,10 @@ from easiest.helpers import mydir
 from copy import deepcopy
 import numpy
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from statsmodels.distributions.empirical_distribution import ECDF
 from IPy import IP
+import whois
 
 ######## SET UP MONGO #########
 mclient = MongoClient()
@@ -99,6 +101,94 @@ doms = coll.distinct("domain")
 
 def longest_prefix(a, b):
     return 32 - len(bin(abs(a.int()-b.int()))[2:])
+
+
+######## find domains that share IPs ###############
+def distinct_set_count_vs_dom():
+    mg3 = coll.aggregate([group3], allowDiskUse=True)
+    domdict = defaultdict(list)
+    domdict24 = defaultdict(list)
+    for mg in mg3:
+        sets = set([tuple(sorted(a['A'])) for a in mg['answers']])
+        sets24 = set()
+        for s in sets:
+            tmp = set()
+            for a in s:
+                tmp.add(".".join(a.split('.')[:-1]))
+            tmp = tuple(sorted(list(tmp)))
+            sets24.add(tmp)
+        domdict[mg['_id']['domain']].append(len(sets))
+        domdict24[mg['_id']['domain']].append(len(sets24))
+
+    x = [numpy.mean(domdict[z]) for z in domdict]
+    x24 = [numpy.mean(domdict24[z]) for z in domdict24]
+
+    # plot median # of IPs per answer for each domain
+    fig, ax = plt.subplots()
+    ecdf = ECDF(x)
+    ecdf24 = ECDF(x24)
+    p = ax.plot(list(ecdf.x), list(ecdf.y))
+    p24 = ax.plot(list(ecdf24.x), list(ecdf24.y))
+    ax.set_xlim([0, 20])
+    ax.set_xlabel("# distinct answer sets")
+    ax.legend((p[0], p24[0]), ("/32 IPs", "/24 IPs"))
+    plt.axvline(x=3, color='r', linestyle='--')
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    fig.savefig(data_dir + 'distinct_set_count_CDF.png')
+    plt.close(fig)
+
+
+def parse_whois(dom):
+    if dom[-1] == '.':
+        dom = dom[:-1]
+    if len(dom.split('.')) > 2:
+        dom = ".".join(dom.split('.')[-2:])
+    whodat = whois.whois(dom)
+    outdat = dict()
+    if whodat['expiration_date'] is None or whodat['name_servers'] is None:
+        return None
+    if 'country' in whodat:
+        outdat['country'] = whodat['country']
+    elif 'address' in whodat and type(whodat['address']) is list:
+        outdat['country'] = whodat['address'][-1]
+    outdat['exp_date'] = whodat['expiration_date']
+    outdat['ns_count'] = len(whodat['name_servers'])
+    return outdat
+
+
+
+######## find domains that share IPs ###############
+def properties_plot(n):
+    mg3 = coll.aggregate([group3], allowDiskUse=True)
+    domdict = defaultdict(list)
+    for mg in mg3:
+        sets = set([tuple(sorted(a['A'])) for a in mg['answers']])
+        domdict[mg['_id']['domain']].append(len(sets))
+
+    x = [(z, numpy.mean(domdict[z])) for z in domdict]
+    alldom = dict()
+    for dom in x:
+        alldom[dom] = dict()
+        whodat = parse_whois(dom)
+        if whodat is not None:
+            for k in whodat.keys():
+                alldom[dom][k] = whodat[k]
+
+    kept = dict()
+    discarded = dict()
+    for dom, count in x:
+        if count < n:
+            discarded[dom] = dict()
+        else:
+            kept[dom] = dict()
+
+
+    with open(data_dir+"kept.json", "w+") as f:
+        json.dump(kept, f)
+
+    with open(data_dir+"discarded.json", "w+") as f:
+        json.dump(discarded, f)
 
 
 ######## find domains that share IPs ###############
@@ -364,4 +454,6 @@ def answer_flux():
 
 if __name__ == "__main__":
     #domain_overlap()
-    answer_flux()
+    #answer_flux()
+    #distinct_set_count_vs_dom()  # used
+    properties_plot(3)  # used
