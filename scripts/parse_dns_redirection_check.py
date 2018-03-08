@@ -10,6 +10,7 @@ import matplotlib.ticker as ticker
 from statsmodels.distributions.empirical_distribution import ECDF
 from IPy import IP
 import whois
+from datetime import datetime
 
 ######## SET UP MONGO #########
 mclient = MongoClient()
@@ -140,21 +141,28 @@ def distinct_set_count_vs_dom():
 
 
 def parse_whois(dom):
-    if dom[-1] == '.':
-        dom = dom[:-1]
-    if len(dom.split('.')) > 2:
-        dom = ".".join(dom.split('.')[-2:])
-    whodat = whois.whois(dom)
-    outdat = dict()
-    if whodat['expiration_date'] is None or whodat['name_servers'] is None:
+    try:
+        print dom
+        if dom[-1] == '.':
+            dom = dom[:-1]
+        whodat = whois.whois(dom)
+        outdat = dict()
+        if whodat['expiration_date'] is None or whodat['name_servers'] is None:
+            return None
+        if 'country' in whodat:
+            outdat['country'] = whodat['country']
+        elif 'address' in whodat and type(whodat['address']) is list:
+            outdat['country'] = whodat['address'][-1]
+        outdat['exp_date'] = whodat['expiration_date']
+        if type(outdat['exp_date']) is list:
+            outdat['exp_date'] = outdat['exp_date'][0]
+        else:
+            outdat['exp_date'] = outdat['exp_date']
+        outdat['exp_date'] = (outdat['exp_date'] - datetime(1970,1,1)).total_seconds()
+        outdat['ns_count'] = len(whodat['name_servers'])
+        return outdat
+    except KeyError:
         return None
-    if 'country' in whodat:
-        outdat['country'] = whodat['country']
-    elif 'address' in whodat and type(whodat['address']) is list:
-        outdat['country'] = whodat['address'][-1]
-    outdat['exp_date'] = whodat['expiration_date']
-    outdat['ns_count'] = len(whodat['name_servers'])
-    return outdat
 
 
 
@@ -168,20 +176,49 @@ def properties_plot(n):
 
     x = [(z, numpy.mean(domdict[z])) for z in domdict]
     alldom = dict()
-    for dom in x:
+    groups = defaultdict(lambda: defaultdict(list))
+    for dom, count in x:
         alldom[dom] = dict()
         whodat = parse_whois(dom)
         if whodat is not None:
             for k in whodat.keys():
+                print 'k', k
+                print 'whodat[k]', whodat[k]
                 alldom[dom][k] = whodat[k]
+                groups[k][whodat[k]].append(dom)
 
     kept = dict()
     discarded = dict()
     for dom, count in x:
         if count < n:
-            discarded[dom] = dict()
+            discarded[dom] = alldom[dom]
         else:
-            kept[dom] = dict()
+            kept[dom] = alldom[dom]
+
+    disrate = defaultdict(dict)  # the rate at which probes with said property were discarded
+    dtups = list()
+    ktups = list()
+    ptups = list() # proportion of kept
+    for k in groups:
+        for val in groups[k]:
+            gsize = float(len(groups[k][val]))
+            dsize = float(len(set(groups[k][val]).intersection(discarded.keys())))
+            ksize = float(len(set(groups[k][val]).intersection(kept.keys())))
+            drat = dsize / gsize
+            krat = ksize / gsize
+            prat = ksize / float(len(kept.keys()))  # portion of all kept
+            disrate[k][val] = drat
+            dtups.append((k, val, drat, dsize, gsize))
+            ktups.append((k, val, krat, ksize, gsize))
+            ptups.append((k, val, prat))
+
+    dtups = sorted(dtups, key=lambda z: z[3], reverse=True)
+    ktups = sorted(ktups, key=lambda z: z[3], reverse=True)
+    ptups = sorted(ptups, key=lambda z: z[2], reverse=True)
+
+    print "discarded:", dtups[:3]
+    print "kept:", ktups[:3]
+    print "proportion of kept:", ptups[:3]
 
 
     with open(data_dir+"kept.json", "w+") as f:
@@ -189,6 +226,18 @@ def properties_plot(n):
 
     with open(data_dir+"discarded.json", "w+") as f:
         json.dump(discarded, f)
+
+    with open(data_dir+"property_groups.json", "w+") as f:
+        json.dump(groups, f)
+
+    with open(data_dir+"discard_props.json", "w+") as f:
+        json.dump(dtups, f)
+
+    with open(data_dir+"kept_props.json", "w+") as f:
+        json.dump(ktups, f)
+
+    with open(data_dir+"pok_props.json", "w+") as f:
+        json.dump(ptups, f)
 
 
 ######## find domains that share IPs ###############
