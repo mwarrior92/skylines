@@ -6,107 +6,225 @@ import json
 from pymongo import MongoClient
 import time
 import numpy
+import datetime
+
+##################################################################
+#                           LOGGING
+##################################################################
+import logging
+import logging.config
+
+logging.config.fileConfig('logging.conf', disable_existing_loggers=False)
+
+# create logger
+logger = logging.getLogger(__name__)
+logger.debug(__name__+"logger loaded")
 
 ################### SET UP DATABASE ######################
 mclient = MongoClient()
 db = mclient.skyline
-coll = db.dns_big_tester
+coll = db.query_experiment
 
 
 ################### SET UP FILE I/O ######################
 topdir = format_dirpath(mydir()+"../")
-datadir = format_dirpath(topdir+"/data/parse_dns_redirection_check")
-label = 'dns_big_tester'
+supportdir = format_dirpath(topdir+"support_files/")
+hardataf = format_dirpath(topdir+'data/parse_hars/')+'getlists.json'
+datadir = format_dirpath(topdir+"data/query_experiment")
+label = 'query_experiment'
 platform = "ripe_atlas"
 
 
 ################### load domain list ######################
-with open(datadir+'kept.json', 'r+') as f:
-    kept = json.load(f)
-alldoms = kept.keys()
+with open(hardataf, 'r+') as f:
+    hardata = json.load(f)
+sites = list(hardata.keys())
+random.shuffle(sites)
+with open(supportdir+"site_order.txt", "w+") as f:
+    json.dump(sites, f)
 
 
-################### acquire clients ######################
-tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation(), target_quantity=1000)
-cg = tmp_tcg.get_ClientGroup(platform)
+
+################### functions ######################
+def waittiltomorrow():
+    t = datetime.datetime.today()
+    future = datetime.datetime(t.year,t.month,t.day,11,0)
+    future += datetime.timedelta(days=1)
+    time.sleep((future-t).seconds)
+    global day
+    global doms_today
+    with open(datadir+'checked_doms'+str(day)+'.json', 'w+') as f:
+        json.dump(list(doms_today), f)
+    doms_today = set()
+
+    global sites_today
+    with open(datadir+'checked_sites'+str(day)+'.json', 'w+') as f:
+        json.dump(list(sites_today), f)
+    day += 1
+    sites_today = list()
 
 
-size = 10  # numpy.ceil(0.1*float(len(alldoms)))
-sampdoms = random.sample(alldoms, size)
 ind = 0
 loop = 0
-while True:
+maxcred = 1000000.0
+remaining = maxcred
+meas_cost = 6.0
+i = 0
+day = 0
+doms_today = set()
+sites_today = list()
+all_checked_sites = list()
+########## GET CLIENTS ##########
+print("getting clients...")
+logger.debug("getting clients...")
+tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation())  # get clients
+cg = tmp_tcg.get_ClientGroup(platform)
+while i < len(sites):
+    ########## GET SITE ##########
+    print("getting site")
+    logger.debug("getting site")
+    site = None
+    if len(sites_today) > 0:  # check if we can intelligently avoid redundant meas.
+        overlap = 0
+        for s in sites[i:]:
+            if s in all_checked_sites:
+                continue
+            recent = sites_today[-1]
+            o = len(set(hardata[recent]['gets']).intersection(hardata[s]['gets']))
+            if o > overlap:  # pick the site with the most overlap
+                overlap = o
+                site = s
+                if overlap == len(hardata[recent]['gets']):  # check for max overlap
+                    break
+    if site is None:
+        while site is None and i < len(sites):  # account for going out of order...
+            site = sites[i]
+            if site in all_checked_sites:
+                site = None
+                i += 1
+    if site is None:  # check if we've reached end of list (unlikely...)
+        break
+    sites_today.append(site)
+    all_checked_sites.append(site)
     # save client set state
-    cg.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"clients_"+str(ind) \
-                 +"_"+str(loop))
+    cg.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"clients_"+str(i))
+    print(str(i)+": "+site)
+    logger.debug(str(i)+": "+site)
+    ########## GET DOMAINS ##########
+    doms = [z for z in hardata[site]['gets'] if z not in doms_today][:20]  # get unchecked doms
+    # figure out how many of the doms we can afford to check
+    client_count = float(len(cg.clients))
+    cost = numpy.floor(client_count*meas_cost*len(doms))
+    logger.debug("cost:"+str(cost)+", clients: "+str(client_count)+\
+            ", doms:"+str(len(doms))+", remaining: "+str(remaining))
+    if cost > remaining:
+        maxdoms = numpy.floor(remaining/(meas_cost*client_count))
+        if maxdoms < 10:  # if too few, assume we should wait till tomorrow
+            waittiltomorrow()
+            remaining = maxcred
+            continue
+        else:
+            doms = doms[:int(maxdoms)]
+            cost = numpy.floor(client_count*meas_cost*len(doms))
 
-    print("ind is: " + str(ind) + "****************")
-    doms = alldoms[ind*size:(ind+1)*size]
+    doms_today = doms_today.union(doms)
+    remaining = numpy.floor(remaining - cost)
 
-    # perform twice to check for fast churn
-    # setup measurement
-    my_mdo = mdo.dns.DNS(label, query_domains=doms)
-    my_mdo.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"meas_"+str(ind)+idx)
+    if len(doms) > 0:
+        print("doing measurement")
+        logger.debug("doing measurement")
+        ########## DO MEASUREMENT ##########
+        # setup measurement
+        my_mdo = mdo.ping.Ping(label, destinations=doms)
+        my_mdo.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"meas_"+str(i))
 
-    # deploy measurement
-    d = dispatcher.Dispatcher(my_mdo, platform, cg)
-    my_mro = d.dispatch()
-    my_mro.set('file_path', format_dirpath(topdir+"data/"+label+"/")+"loop_"+str(ind)+".json")
+        j = 0
+        loopsize = int(50.0 / float(len(doms)))
+        print(str(loopsize))
+        cgs = list()
+        mros = list()
+        while j+loopsize <= len(cg.clients) :  # we go one client at a time because ripe rate limits
+            cgs.append(cdo.ClientGroup(cg.clients[j:j+loopsize]))
+            # deploy measurement
+            d = dispatcher.Dispatcher(my_mdo, platform, cgs[-1])
+            mros.append(d.dispatch())
+            if mros[-1].slow_down:
+                mros.pop(-1)
+                cgs.pop(-1)
+                for k, my_mro in enumerate(mros):
+                    print(str(k))
+                    # collect measurement results
+                    if k == 0:
+                        c = collector.SpinningCollector(my_mro, timeout=60*10, spin_time=60*1)
+                    else:
+                        c = collector.SpinningCollector(my_mro, timeout=15, spin_time=15)
 
-    # collect measurement results
-    c = collector.SpinningCollector(my_mro, timeout=60*5, spin_time=120)
+                    #c.grabber_thread.join()
+                    collector.wait_on_collectors([c])
 
-    #c.grabber_thread.join()
-    collector.wait_on_collectors([c])
+                    try:
+                        with open(my_mro.get('file_path'), 'r+') as f:
+                            data = json.load(f)
+                    except IOError:
+                        continue
 
-    with open(my_mro.get('file_path'), 'r+') as f:
-        data = json.load(f)
+                    client_info = dict()
+                    pushed = 0
+                    for client in cgs[k].get('clients'):
+                        client_info[client.get('probe_id')] = client.get('country_code')
+                    entries = list()
+                    for r in data['results']:
+                        r['idx'] = i
+                        r['day'] = day
+                        entries.append(r)
+                    if len(data['results']) > 0:
+                        coll.insert_many(entries)
+                    time.sleep(5)
+                if len(mros) == 0:
+                    time.sleep(60*5)
+                else:
+                    mros = list()
+                    cgs = list()
+                continue
 
-    client_info = dict()
-    pushed = 0
-    for client in cg.get('clients'):
-        client_info[client.get('probe_id')] = client.get('country_code')
-    entries = list()
-    good_probes = set()
-    for r in data['results']:
-        if 'answers' in r:
-            if 'A' in r['answers']:
-                entries.append({
-                    'probe_id': r['prb_id'],
-                    'answers': r['answers'],
-                    'country_code': client_info[r['prb_id']],
-                    'domain': r['query_domain'],
-                    'iteration': ind
-                    })
-                good_probes.add(r['prb_id'])
+            mros[-1].set('file_path', format_dirpath(topdir+"data/"+label+"/")\
+                    +"".join(site.split('.'))+"_"+str(j)+".json")
+            j += loopsize
+        for k, my_mro in enumerate(mros):
+            # collect measurement results
+            print(str(k))
+            if k == 0:
+                c = collector.SpinningCollector(my_mro, timeout=60*10, spin_time=60*1)
+            else:
+                c = collector.SpinningCollector(my_mro, timeout=60, spin_time=60)
 
-    coll.insert_many(entries)
-    time.sleep(60)
+            #c.grabber_thread.join()
+            collector.wait_on_collectors([c])
 
-    # refresh client set (replace unresponsive probes)
-    bad_probes = [z for z in cg.get('clients') if z.get('probe_id') not in good_probes]
-    cg.clients = [z for z in cg.get('clients') if z.get('probe_id') in good_probes]
-    overlap = bad_probes
-    while len(overlap) > 1:  # keep reselecting until there's no redundancy
-        tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation(), target_quantity=len(overlap))
-        newprobes = tmp_tcg.get_ClientGroup(platform)
-        overlap = newprobes.intersection(cg)
-        newprobes.clients = [z for z in newprobes.get('clients') if z.get('probe_id') not in overlap]
-        cg = cdo.ClientGroup.merge(cg, newprobes)
+            try:
+                with open(my_mro.get('file_path'), 'r+') as f:
+                    data = json.load(f)
+            except IOError:
+                continue
 
-    ind += 1
-    loop += 1
-    # if we've looped enough times, pick a new set of probes
-    if loop % 5 == 0 and loop > 0:
-        loop = 0
-        overlap = cg.get('probe_ids')
-        tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation(), target_quantity=1000)
+            client_info = dict()
+            pushed = 0
+            for client in cgs[k].get('clients'):
+                client_info[client.get('probe_id')] = client.get('country_code')
+            entries = list()
+            for r in data['results']:
+                r['idx'] = i
+                r['day'] = day
+                entries.append(r)
+            if len(data['results']) > 0:
+                coll.insert_many(entries)
+        time.sleep(60*5)
 
-        cg = tmp_tcg.get_ClientGroup(platform)
-        while len(overlap) > 1:  # keep reselecting until there's no redundancy
-            tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation(), target_quantity=len(overlap))
-            newprobes = tmp_tcg.get_ClientGroup(platform)
-            overlap = newprobes.intersection(cg)
-            newprobes.clients = [z for z in newprobes.get('clients') if z.get('probe_id') not in overlap]
-            cg = cdo.ClientGroup.merge(cg, newprobes)
+    else:
+        logger.debug("dom list len 0")
+        print("dom list len 0")
+
+    i += 1
+    with open(datadir+'all_checked_sites.json', 'w+'):
+        json.dump(all_checked_sites, f)
 
