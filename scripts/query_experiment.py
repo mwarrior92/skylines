@@ -140,43 +140,34 @@ while i < len(sites):
         my_mdo.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"meas_"+str(i))
 
         j = 0
-        loopsize = int(50.0 / float(len(doms)))
-        print(str(loopsize))
-        cgs = list()
-        mros = list()
-        while j+loopsize <= len(cg.clients) :  # we go one client at a time because ripe rate limits
-            cgs.append(cdo.ClientGroup(cg.clients[j:j+loopsize]))
-            # deploy measurement
-            d = dispatcher.Dispatcher(my_mdo, platform, cgs[-1])
-            mros.append(d.dispatch())
-            mros[-1].set('file_path', format_dirpath(topdir+"data/"+label+"/")\
-                    +"".join(site.split('.'))+"_"+str(j)+".json")
-            j += loopsize
-        for k, my_mro in enumerate(mros):
-            # collect measurement results
-            print(str(k))
-            c = collector.SpinningCollector(my_mro, timeout=1, spin_time=1)
+        # deploy measurement
+        d = dispatcher.Dispatcher(my_mdo, platform, cg)
+        my_mro = d.dispatch()
+        my_mro.set('file_path', format_dirpath(topdir+"data/"+label+"/")\
+                +"".join(site.split('.'))+".json")
+        # collect measurement results
+        c = collector.SpinningCollector(my_mro, timeout=20*60, spin_time=5*60)
 
-            #c.grabber_thread.join()
-            collector.wait_on_collectors([c])
+        #c.grabber_thread.join()
+        collector.wait_on_collectors([c])
 
-            try:
-                with open(my_mro.get('file_path'), 'r+') as f:
-                    data = json.load(f)
-            except IOError:
-                continue
+        try:
+            with open(my_mro.get('file_path'), 'r+') as f:
+                data = json.load(f)
+        except IOError:
+            continue
 
-            client_info = dict()
-            pushed = 0
-            for client in cgs[k].get('clients'):
-                client_info[client.get('probe_id')] = client.get('country_code')
-            entries = list()
-            for r in data['results']:
-                r['idx'] = i
-                r['day'] = day
-                entries.append(r)
-            if len(data['results']) > 0:
-                coll.insert_many(entries)
+        client_info = dict()
+        pushed = 0
+        for client in cg.get('clients'):
+            client_info[client.get('probe_id')] = client.get('country_code')
+        entries = list()
+        for r in data['results']:
+            r['idx'] = i
+            r['day'] = day
+            entries.append(r)
+        if len(data['results']) > 0:
+            coll.insert_many(entries)
         time.sleep(60*5)
 
     else:
