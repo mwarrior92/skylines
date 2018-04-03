@@ -23,7 +23,7 @@ logger.debug(__name__+"logger loaded")
 ################### SET UP DATABASE ######################
 mclient = MongoClient()
 db = mclient.skyline
-coll = db.query_experiment
+coll = db.query_experiment_beta
 
 
 ################### SET UP FILE I/O ######################
@@ -79,6 +79,7 @@ print("getting clients...")
 logger.debug("getting clients...")
 tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation())  # get clients
 cg = tmp_tcg.get_ClientGroup(platform)
+random.shuffle(cg.clients)  # avoid hitting 25 same target cap
 while i < len(sites):
     ########## GET SITE ##########
     print("getting site")
