@@ -154,10 +154,7 @@ while i < len(sites):
         for k, my_mro in enumerate(mros):
             # collect measurement results
             print(str(k))
-            if k == 0:
-                c = collector.SpinningCollector(my_mro, timeout=60*10, spin_time=60*1)
-            else:
-                c = collector.SpinningCollector(my_mro, timeout=60, spin_time=60)
+            c = collector.SpinningCollector(my_mro, timeout=1, spin_time=1)
 
             #c.grabber_thread.join()
             collector.wait_on_collectors([c])
