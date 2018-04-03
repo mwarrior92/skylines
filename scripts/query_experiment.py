@@ -111,7 +111,7 @@ while i < len(sites):
     print(str(i)+": "+site)
     logger.debug(str(i)+": "+site)
     ########## GET DOMAINS ##########
-    doms = [z for z in hardata[site]['gets'] if z not in doms_today][:20]  # get unchecked doms
+    doms = [z for z in hardata[site]['gets'] if z not in doms_today][:15]  # get unchecked doms
     # figure out how many of the doms we can afford to check
     client_count = float(len(cg.clients))
     cost = numpy.floor(client_count*meas_cost*len(doms))
