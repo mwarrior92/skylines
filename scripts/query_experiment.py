@@ -148,45 +148,6 @@ while i < len(sites):
             # deploy measurement
             d = dispatcher.Dispatcher(my_mdo, platform, cgs[-1])
             mros.append(d.dispatch())
-            if mros[-1].slow_down:
-                mros.pop(-1)
-                cgs.pop(-1)
-                for k, my_mro in enumerate(mros):
-                    print(str(k))
-                    # collect measurement results
-                    if k == 0:
-                        c = collector.SpinningCollector(my_mro, timeout=60*10, spin_time=60*1)
-                    else:
-                        c = collector.SpinningCollector(my_mro, timeout=15, spin_time=15)
-
-                    #c.grabber_thread.join()
-                    collector.wait_on_collectors([c])
-
-                    try:
-                        with open(my_mro.get('file_path'), 'r+') as f:
-                            data = json.load(f)
-                    except IOError:
-                        continue
-
-                    client_info = dict()
-                    pushed = 0
-                    for client in cgs[k].get('clients'):
-                        client_info[client.get('probe_id')] = client.get('country_code')
-                    entries = list()
-                    for r in data['results']:
-                        r['idx'] = i
-                        r['day'] = day
-                        entries.append(r)
-                    if len(data['results']) > 0:
-                        coll.insert_many(entries)
-                    time.sleep(5)
-                if len(mros) == 0:
-                    time.sleep(60*5)
-                else:
-                    mros = list()
-                    cgs = list()
-                continue
-
             mros[-1].set('file_path', format_dirpath(topdir+"data/"+label+"/")\
                     +"".join(site.split('.'))+"_"+str(j)+".json")
             j += loopsize
