@@ -77,9 +77,12 @@ all_checked_sites = list()
 ########## GET CLIENTS ##########
 print("getting clients...")
 logger.debug("getting clients...")
-tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation())  # get clients
+tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation(), 100)  # get clients
 cg = tmp_tcg.get_ClientGroup(platform)
 random.shuffle(cg.clients)  # avoid hitting 25 same target cap
+t = time.time()
+with open(datadir+'started.txt', 'w+') as f:
+    f.write(str(t))
 while i < len(sites):
     ########## GET SITE ##########
     print("getting site")
@@ -112,7 +115,7 @@ while i < len(sites):
     print(str(i)+": "+site)
     logger.debug(str(i)+": "+site)
     ########## GET DOMAINS ##########
-    doms = [z for z in hardata[site]['gets'] if z not in doms_today][:15]  # get unchecked doms
+    doms = [z for z in hardata[site]['gets'] if z not in doms_today][:10]  # get unchecked doms
     # figure out how many of the doms we can afford to check
     client_count = float(len(cg.clients))
     cost = numpy.floor(client_count*meas_cost*len(doms))
@@ -175,6 +178,10 @@ while i < len(sites):
         print("dom list len 0")
 
     i += 1
-    with open(datadir+'all_checked_sites.json', 'w+'):
-        json.dump(all_checked_sites, f)
+    t = time.time()
+    with open(datadir+'finished.txt', 'w+') as f:
+        f.write(str(t))
+    with open(datadir+'all_checked_sites.json', 'w+') as ff:
+        json.dump(all_checked_sites, ff)
+    break
 
