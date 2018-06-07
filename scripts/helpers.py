@@ -360,3 +360,6 @@ def terminal(command):
     p = subprocess.Popen(command, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, shell=True)
     return p.communicate()
+
+
+datadir = format_dirpath(top_dir+'../data/')
