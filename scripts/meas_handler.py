@@ -1,4 +1,5 @@
 from __future__ import print_function
+import sys
 import ripe.atlas.cousteau as rac
 import json
 from datetime import datetime, timedelta
@@ -6,7 +7,7 @@ from pymongo import MongoClient
 
 mclient = MongoClient()
 db = mclient.skyline
-coll = db.sqe2
+coll = db.sap
 
 
 class Probes(object):
@@ -78,7 +79,7 @@ class Results(object):
         self.latest_result_pull = None
         self.meas_iter = None
         try:
-            with open('inds.json', 'r+') as f:
+            with open(self.outf+'inds.json', 'r+') as f:
                 inds = json.load(f)
             self.meas_ind = inds['meas_ind']
             self.result_ind = inds['result_ind']
@@ -95,8 +96,10 @@ class Results(object):
             msm_id = self.latest_meas_pull['id']
             success, self.latest_result_pull = rac.AtlasResultsRequest(msm_id=msm_id).create()
             if success:
+                print("S", end='')
                 for ind, res in enumerate(self.latest_result_pull):
                     if ind < self.result_ind:
+                        print("continuing!"+str(ind)+','+str(self.result_ind))
                         continue
                     for k in useless:
                         try:
@@ -107,22 +110,26 @@ class Results(object):
                         json.dump(res, f)
                         f.write("\n")
                 coll.insert_many(self.latest_result_pull)
-                with open('inds.json', 'w+') as f:
+                with open(self.outf+'inds.json', 'w+') as f:
                     json.dump({'meas_ind': self.meas_ind, 'result_ind': self.result_ind}, f)
+            else:
+                print(msm_id)
         except Exception as e:
             with open("result_pull_fails.json", 'a+') as f:
                 json.dump({'meas': self.latest_meas_pull, 'e': str(e)}, f)
                 f.write("\n")
             print("failed to pull", end=" ")
             print(e)
+        sys.stdout.flush()
 
     def __iter__(self):
         if self.meas_iter is None:
             self.get_meas_iter()
         print(type(self.meas_iter))
         for ind, item in enumerate(self.meas_iter):
-            print(item)
+            # print(item)
             if ind < self.meas_ind:
+                print('continuing!!'+str(ind)+','+str(self.meas_ind))
                 continue
             self.latest_meas_pull = item
             self.handle_meas()

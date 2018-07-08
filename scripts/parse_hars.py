@@ -1,3 +1,6 @@
+'''
+    extract set of urls used by each site's landing page
+'''
 from helpers import format_dirpath, mydir, listfiles
 import json
 from haralyzer import HarParser

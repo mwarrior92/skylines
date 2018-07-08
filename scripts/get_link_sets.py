@@ -1,5 +1,7 @@
 '''
     Collect the set of domains that are resolved on each website's landing page
+
+    Uses Umbrella data for set of sites to check
 '''
 
 

@@ -1,12 +1,9 @@
-from easiest.mms import collector, dispatcher, mdo
-from easiest import cdo
-from easiest.helpers import format_dirpath, mydir
-import random
+from helpers import format_dirpath, mydir
 import json
-from pymongo import MongoClient
 import time
-import numpy
 import datetime
+from collections import defaultdict
+import meas_handler
 
 ##################################################################
 #                           LOGGING
@@ -20,18 +17,13 @@ logging.config.fileConfig('logging.conf', disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 logger.debug(__name__+"logger loaded")
 
-################### SET UP DATABASE ######################
-mclient = MongoClient()
-db = mclient.skyline
-coll = db.query_experiment_beta
-
 
 ################### SET UP FILE I/O ######################
 topdir = format_dirpath(mydir()+"../")
 supportdir = format_dirpath(topdir+"support_files/")
 hardataf = format_dirpath(topdir+'data/parse_hars/')+'getlists.json'
-datadir = format_dirpath(topdir+"data/query_experiment")
-label = 'query_experiment'
+label = 'short_query_experiment'
+datadir = format_dirpath(topdir+"data/"+label)
 platform = "ripe_atlas"
 
 
@@ -39,11 +31,15 @@ platform = "ripe_atlas"
 with open(hardataf, 'r+') as f:
     hardata = json.load(f)
 sites = list(hardata.keys())
-random.shuffle(sites)
+
+# number of sites that include dom
+site_count = defaultdict(int)
+for site in sites:
+    for dom in hardata[site]['gets']:
+        site_count[dom] += 1
+ordered_doms = sorted(list(site_count.keys()), key=lambda z: site_count[z], reverse=True)
 with open(supportdir+"site_order.txt", "w+") as f:
-    json.dump(sites, f)
-
-
+    json.dump(ordered_doms, f)
 
 ################### functions ######################
 def waittiltomorrow():
@@ -51,137 +47,59 @@ def waittiltomorrow():
     future = datetime.datetime(t.year,t.month,t.day,11,0)
     future += datetime.timedelta(days=1)
     time.sleep((future-t).seconds)
-    global day
-    global doms_today
-    with open(datadir+'checked_doms'+str(day)+'.json', 'w+') as f:
-        json.dump(list(doms_today), f)
-    doms_today = set()
 
-    global sites_today
-    with open(datadir+'checked_sites'+str(day)+'.json', 'w+') as f:
-        json.dump(list(sites_today), f)
-    day += 1
-    sites_today = list()
+################### init globals ##################
+with open('config.json', 'r+') as f:
+    key = json.load(f)['ripeatlas_schedule_meas_key']
 
 
-ind = 0
-loop = 0
-maxcred = 1000000.0
-remaining = maxcred
-meas_cost = 6.0
-i = 0
-day = 0
-doms_today = set()
-sites_today = list()
-all_checked_sites = list()
-########## GET CLIENTS ##########
-print("getting clients...")
-logger.debug("getting clients...")
-tmp_tcg = cdo.TargetClientGroup(cdo.TargetLocation(), 100)  # get clients
-cg = tmp_tcg.get_ClientGroup(platform)
-random.shuffle(cg.clients)  # avoid hitting 25 same target cap
-t = time.time()
-with open(datadir+'started.txt', 'w+') as f:
-    f.write(str(t))
-while i < len(sites):
-    ########## GET SITE ##########
-    print("getting site")
-    logger.debug("getting site")
-    site = None
-    if len(sites_today) > 0:  # check if we can intelligently avoid redundant meas.
-        overlap = 0
-        for s in sites[i:]:
-            if s in all_checked_sites:
+if __name__ == '__main__':
+    probes = meas_handler.Probes()
+    probes.get_probes()
+    subprobes = list()
+    groups = list()
+    count = 0
+    for p in probes.probes:
+        subprobes.append(p)
+        count += 1
+        if count % 50 == 0:
+            count = 0
+            groups.append(meas_handler.Probes(probes=subprobes))
+            subprobes = list()
+    for j, dom in enumerate(ordered_doms):
+        if j < 150:
+            continue
+        print(dom)
+        for i, group in enumerate(groups):
+            if dom in [z['kwargs']['target'] for i,z in enumerate(group.deployments) if group.response_bools[i]]:
                 continue
-            recent = sites_today[-1]
-            o = len(set(hardata[recent]['gets']).intersection(hardata[s]['gets']))
-            if o > overlap:  # pick the site with the most overlap
-                overlap = o
-                site = s
-                if overlap == len(hardata[recent]['gets']):  # check for max overlap
-                    break
-    if site is None:
-        while site is None and i < len(sites):  # account for going out of order...
-            site = sites[i]
-            if site in all_checked_sites:
-                site = None
-                i += 1
-    if site is None:  # check if we've reached end of list (unlikely...)
-        break
-    sites_today.append(site)
-    all_checked_sites.append(site)
-    # save client set state
-    cg.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"clients_"+str(i))
-    print(str(i)+": "+site)
-    logger.debug(str(i)+": "+site)
-    ########## GET DOMAINS ##########
-    doms = [z for z in hardata[site]['gets'] if z not in doms_today][:10]  # get unchecked doms
-    # figure out how many of the doms we can afford to check
-    client_count = float(len(cg.clients))
-    cost = numpy.floor(client_count*meas_cost*len(doms))
-    logger.debug("cost:"+str(cost)+", clients: "+str(client_count)+\
-            ", doms:"+str(len(doms))+", remaining: "+str(remaining))
-    if cost > remaining:
-        maxdoms = numpy.floor(remaining/(meas_cost*client_count))
-        if maxdoms < 10:  # if too few, assume we should wait till tomorrow
-            waittiltomorrow()
-            remaining = maxcred
-            continue
-        else:
-            doms = doms[:int(maxdoms)]
-            cost = numpy.floor(client_count*meas_cost*len(doms))
-
-    doms_today = doms_today.union(doms)
-    remaining = numpy.floor(remaining - cost)
-
-    if len(doms) > 0:
-        print("doing measurement")
-        logger.debug("doing measurement")
-        ########## DO MEASUREMENT ##########
-        # setup measurement
-        my_mdo = mdo.ping.Ping(label, destinations=doms)
-        my_mdo.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"meas_"+str(i))
-
-        j = 0
-        # deploy measurement
-        d = dispatcher.Dispatcher(my_mdo, platform, cg)
-        my_mro = d.dispatch()
-        my_mro.set('file_path', format_dirpath(topdir+"data/"+label+"/")\
-                +"".join(site.split('.'))+".json")
-        # collect measurement results
-        c = collector.SpinningCollector(my_mro, timeout=20*60, spin_time=5*60)
-
-        #c.grabber_thread.join()
-        collector.wait_on_collectors([c])
-
-        try:
-            with open(my_mro.get('file_path'), 'r+') as f:
-                data = json.load(f)
-        except IOError:
-            continue
-
-        client_info = dict()
-        pushed = 0
-        for client in cg.get('clients'):
-            client_info[client.get('probe_id')] = client.get('country_code')
-        entries = list()
-        for r in data['results']:
-            r['idx'] = i
-            r['day'] = day
-            entries.append(r)
-        if len(data['results']) > 0:
-            coll.insert_many(entries)
-        time.sleep(60*5)
-
-    else:
-        logger.debug("dom list len 0")
-        print("dom list len 0")
-
-    i += 1
-    t = time.time()
-    with open(datadir+'finished.txt', 'w+') as f:
-        f.write(str(t))
-    with open(datadir+'all_checked_sites.json', 'w+') as ff:
-        json.dump(all_checked_sites, ff)
-    break
+            success = False
+            tries = 0
+            while tries < 10 and not success:
+                tries += 1
+                success = group.deploy('ping', 'skyline_all_probes', ['skyline', 'page_links', 'harfile',
+                    'experiment'], target=dom, key=key)
+                if success:
+                    print("success!")
+                    with open(datadir+str(i)+'_group.json', 'w+') as f:
+                        json.dump(group.__dict__, f)
+                else:
+                    print(group.responses[-1])
+                    print('currently on '+dom+', which is '+str(j)+'th')
+                    try:
+                        rstr = json.dumps(group.responses[-1])
+                        if 'same target' in rstr or 'more than' in rstr:
+                            print("sleeping for 11 minutes")
+                            time.sleep(11*60)
+                        elif 'daily' in rstr:
+                            print("waiting til tomorrow...")
+                            waittiltomorrow()
+                    except TypeError:
+                        print("can't serialize... sleeping for a minute")
+                        time.sleep(60)
+                    tmp = group.pop()
+                    try:
+                        print(tmp)
+                    except:
+                        pass
 
