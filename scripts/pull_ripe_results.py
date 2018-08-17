@@ -3,6 +3,19 @@ import helpers
 
 
 if __name__ == '__main__':
-    results = meas_handler.Results(helpers.datadir+'sap.json', description='skyline_all_probes')
-    results.get_results()
-
+    i = 86400 # -> seconds in a day
+    a = 1530285305
+    b = a - i
+    c = list()
+    l = 0
+    while len(c) == 0 or sum(c) > 0:
+        print(l)
+        results = meas_handler.Results(helpers.datadir+'sam'+str(l)+'.json', description='skyline_all_probes',
+                stop_time__lte=a, start_time__gt=b)
+        results.get_results()
+        c.append(results.meas_ind)
+        if len(c) > 10:
+            c.pop(0)
+        a -= i
+        b = a - i
+        l += 1

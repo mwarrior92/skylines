@@ -7,7 +7,7 @@ from pymongo import MongoClient
 
 mclient = MongoClient()
 db = mclient.skyline
-coll = db.sap
+coll = db.sam
 
 
 class Probes(object):
@@ -40,7 +40,6 @@ class Probes(object):
 
     def deploy(self, mtype, description, tags, is_oneoff=True, af=4, start_time=None,
             resolve_on_probe=True, key=None, **kwargs):
-        print([z['id'] for z in self.probes])
         sources = [rac.AtlasSource(
             type='probes',
             value=",".join([str(z['id']) for z in self.probes]),
@@ -96,7 +95,6 @@ class Results(object):
             msm_id = self.latest_meas_pull['id']
             success, self.latest_result_pull = rac.AtlasResultsRequest(msm_id=msm_id).create()
             if success:
-                print("S", end='')
                 for ind, res in enumerate(self.latest_result_pull):
                     if ind < self.result_ind:
                         print("continuing!"+str(ind)+','+str(self.result_ind))
@@ -113,7 +111,7 @@ class Results(object):
                 with open(self.outf+'inds.json', 'w+') as f:
                     json.dump({'meas_ind': self.meas_ind, 'result_ind': self.result_ind}, f)
             else:
-                print(msm_id)
+                print("failed on "+str(msm_id))
         except Exception as e:
             with open("result_pull_fails.json", 'a+') as f:
                 json.dump({'meas': self.latest_meas_pull, 'e': str(e)}, f)
@@ -125,9 +123,7 @@ class Results(object):
     def __iter__(self):
         if self.meas_iter is None:
             self.get_meas_iter()
-        print(type(self.meas_iter))
         for ind, item in enumerate(self.meas_iter):
-            # print(item)
             if ind < self.meas_ind:
                 print('continuing!!'+str(ind)+','+str(self.meas_ind))
                 continue
