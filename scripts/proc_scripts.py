@@ -31,12 +31,14 @@ def get_sites_per_dom():
     for site in sites:
         for dom in hardata[site]['gets']:
             site_sets[dom].add(site)
+    for d in site_sets:
+        site_sets[d] = list(site_sets[d])
     with open('sites_per_dom.json', 'w+') as f:
         json.dump(site_sets, f)
     return site_sets
 
 
-def num_sites_using_each_link_cdf(fname):
+def num_sites_using_each_link_cdf(fname='sites_per_dom.json'):
     with open(fname, 'r+') as f:
         site_sets = json.load(f)
 
@@ -49,6 +51,7 @@ def num_sites_using_each_link_cdf(fname):
 
 
 def get_doms_per_site():
+    global hardataf
     with open(hardataf, 'r+') as f:
         hardata = json.load(f)
     sites = list(hardata.keys())
@@ -56,6 +59,8 @@ def get_doms_per_site():
     dom_sets = defaultdict(set)
     for site in sites:
         dom_sets[site] = set(hardata[site]['gets'])
+    for s in dom_sets:
+        dom_sets[s] = list(dom_sets[s])
     with open('doms_per_site.json', 'w+') as f:
         json.dump(dom_sets, f)
     return dom_sets
@@ -71,7 +76,9 @@ def num_doms_per_site_cdf(fname='doms_per_site.json'):
 
 
 def num_sites_covered_by_top_n_doms(fname='sites_per_dom.json'):
-    with open(fname, 'w+') as f:
+    with open(hardataf, 'r+') as f:
+        hardata = json.load(f)
+    with open(fname, 'r+') as f:
         site_sets = json.load(f)
     ordered_doms = sorted(list(site_sets.keys()), key=lambda z: len(site_sets[z]), reverse=True)
     print('sites covered...')
@@ -161,7 +168,7 @@ def nums_per_ip(data):
     cipsubs = defaultdict(set)
     dipsubs24 = defaultdict(set)
     cipsubs24 = defaultdict(set)
-    for row in tmp.iterrows():
+    for _, row in tmp.iterrows():
         prefix = get_prefix(row._id)
         ip24 = get_24(row._id).split('/')[0]
         dipsubs[prefix].update(row.domains)
@@ -292,7 +299,7 @@ def same_nth_ip_prob(data):
     all_prefixes = set()
     all_countries = set()
     all_asns = set()
-    for row in binned24.iterrows():
+    for _, row in binned24.iterrows():
         clients = row.clients.tolist()
         for i, a in enumerate(clients[:-1]):
             A = get_client_info(a['src_addr'], a['probe'])
@@ -370,7 +377,7 @@ def same_nth_ip_prob(data):
     pcounts = defaultdict(list) # prefix
     ccounts = defaultdict(list) # country
     acounts = defaultdict(list) # asn
-    for row in binnedprefix.iterrows():
+    for _, row in binnedprefix.iterrows():
         clients = row.clients.tolist()
         for i, a in enumerate(clients[:-1]):
             A = get_client_info(a['src_addr'], a['probe'])
