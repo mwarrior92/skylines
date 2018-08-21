@@ -178,6 +178,34 @@ def nums_per_ip(data):
         json.dump({'prefixes': ips24, 'dom_counts': dcounts24, 'client_counts': ccounts24}, f)
 
 
+def nums_per_ip_cdf():
+    with open('num_per_ip.json', 'r+') as f:
+        data = json.load(f)
+    dcounts, ccounts = ECDF(data['dom_counts']), ECDF(data['client_counts'])
+    dx, dy = list(dcounts.x), list(dcounts.y)
+    cx, cy = list(ccounts.x), list(ccounts.y)
+    with open('num_per_ip_cdf.json', 'w+') as f:
+        json.dump({'doms_per_ip': dx, 'CDF_of_ips_for_doms': dy, 'clients_per_ip': cx,
+            'CDF_of_ips_for_clients': cy}, f)
+    with open('num_per_prefix.json', 'r+') as f:
+        data = json.load(f)
+    dcounts, ccounts = ECDF(data['dom_counts']), ECDF(data['client_counts'])
+    dx, dy = list(dcounts.x), list(dcounts.y)
+    cx, cy = list(ccounts.x), list(ccounts.y)
+    with open('num_per_prefix_cdf.json', 'w+') as f:
+        json.dump({'doms_per_ip': dx, 'CDF_of_ips_for_doms': dy, 'clients_per_ip': cx,
+            'CDF_of_ips_for_clients': cy}, f)
+    with open('num_per_24.json', 'r+') as f:
+        data = json.load(f)
+    dcounts, ccounts = ECDF(data['dom_counts']), ECDF(data['client_counts'])
+    dx, dy = list(dcounts.x), list(dcounts.y)
+    cx, cy = list(ccounts.x), list(ccounts.y)
+    with open('num_per_24_cdf.json', 'w+') as f:
+        json.dump({'doms_per_ip': dx, 'CDF_of_ips_for_doms': dy, 'clients_per_ip': cx,
+            'CDF_of_ips_for_clients': cy}, f)
+
+
+
 per_ip_per_dom = {
         '$group': {
             '_id': {
@@ -240,28 +268,193 @@ def get_client_info(ip, cid):
 
 
 def same_nth_ip_prob(data):
+    with open('sites_per_dom.json', 'r+') as f:
+        spd = json.load(f)
+    with open('doms_per_site.json', 'r+') as f:
+        dps = json.load(f)
     tmp = data._id.apply(lambda z: is_public(z['dst_addr']))
     tmp = data.loc[tmp]
-    client_groups = tmp.clients.apply(lambda z: [(i['src_addr'], i['probe']) for i in z]).tolist()
-    all_clients = set()
-    for g in client_groups:
-        all_clients.update(g)
-    all_clients = list(all_clients)
+    tmp['ip24'] = tmp._id.apply(lambda z: get_24(z['dst_addr']))
+    tmp['prefix'] = tmp._id.apply(lambda z: get_prefix(z['dst_addr']))
+    tmp['domain'] = tmp._id.apply(lambda z: z['domain'])
+    binned24 = tmp.groupby(['ip24', 'domain']).agg({'clients': 'sum', 'ip24': lambda z: z[0],
+        'domain': lambda z: z[0]})
+    binnedprefix = tmp.groupby(['prefix', 'domain']).agg({'clients': 'sum', 'prefix': lambda z: z[0],
+        'domain': lambda z: z[0]})
+
+    ##########
 
     rcounts = defaultdict(list) # raw IP
     pcounts = defaultdict(list) # prefix
     ccounts = defaultdict(list) # country
     acounts = defaultdict(list) # asn
-    for row in tmp.iterrows():
+    all_clients = set()
+    all_prefixes = set()
+    all_countries = set()
+    all_asns = set()
+    for row in binned24.iterrows():
+        clients = row.clients.tolist()
+        for i, a in enumerate(clients[:-1]):
+            A = get_client_info(a['src_addr'], a['probe'])
+            all_clients.add(A['ip'])
+            all_countries.add(A['country'])
+            all_asns.add(A['asn'])
+            all_prefixes.add(A['prefix'])
+            for b in clients[i+1:]:
+                B = get_client_info(b['src_addr'], b['probe'])
+                rcounts[str(tuple(sorted([A['ip'], B['ip']])))].append(row.domain)
+                ccounts[str(tuple(sorted([A['country'], B['country']])))].append(row.domain)
+                pcounts[str(tuple(sorted([A['prefix'], B['prefix']])))].append(row.domain)
+                acounts[str(tuple(sorted([A['asn'], B['asn']])))].append(row.domain)
+        all_clients.add(B['ip'])
+        all_countries.add(B['country'])
+        all_asns.add(B['asn'])
+        all_prefixes.add(B['prefix'])
+    with open('matches_24.json', 'w+') as f:
+        json.dump({'asn': acounts, 'country': ccounts, 'prefix': pcounts, 'ip24': rcounts}, f)
+    with open('all_clients.json', 'w+') as f:
+        json.dump({'all_clients': all_clients, 'all_countries': all_countries, 'all_asns': all_asns,
+            'all_prefixes': all_prefixes}, f)
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    dpsr = defaultdict(set)
+    doms = set(tmp.domain.tolist())
+    sscp_out = dict()
+    for d in dps:
+        if d in doms:
+            dpsr[site].add(d)
+    for k in rcounts:
+        sites = set()
+        for d in rcounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(rcounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['ip24'] = sscp
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    for k in pcounts:
+        sites = set()
+        for d in pcounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(pcounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['prefix'] = sscp
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    for k in ccounts:
+        sites = set()
+        for d in ccounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(ccounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['country'] = sscp
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    for k in acounts:
+        sites = set()
+        for d in acounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(acounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['asn'] = sscp
+    with open('same_site_client_pairs24.json', 'w+') as f:
+        json.dump(sscp_out, f)
+
+    ##########
+
+    rcounts = defaultdict(list) # raw IP
+    pcounts = defaultdict(list) # prefix
+    ccounts = defaultdict(list) # country
+    acounts = defaultdict(list) # asn
+    for row in binnedprefix.iterrows():
         clients = row.clients.tolist()
         for i, a in enumerate(clients[:-1]):
             A = get_client_info(a['src_addr'], a['probe'])
             for b in clients[i+1:]:
                 B = get_client_info(b['src_addr'], b['probe'])
-                rcounts[tuple(sorted([A['ip'], B['ip']]))].append(row._id.domain)
-                ccounts[tuple(sorted([A['country'], B['country']]))].append(row._id.domain)
-                pcounts[tuple(sorted([A['prefix'], B['prefix']]))].append(row._id.domain)
-                acounts[tuple(sorted([A['asn'], B['asn']]))].append(row._id.domain)
+                rcounts[str(tuple(sorted([A['ip'], B['ip']])))].append(row.domain)
+                ccounts[str(tuple(sorted([A['country'], B['country']])))].append(row.domain)
+                pcounts[str(tuple(sorted([A['prefix'], B['prefix']])))].append(row.domain)
+                acounts[str(tuple(sorted([A['asn'], B['asn']])))].append(row.domain)
+    with open('matches_prefix.json', 'w+') as f:
+        json.dump({'asn': acounts, 'country': ccounts, 'prefix': pcounts, 'ipp': rcounts}, f)
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    dpsr = defaultdict(set)
+    doms = set(tmp.domain.tolist())
+    sscp_out = dict()
+    for d in dps:
+        if d in doms:
+            dpsr[site].add(d)
+    for k in rcounts:
+        sites = set()
+        for d in rcounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(rcounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['ip24'] = sscp
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    for k in pcounts:
+        sites = set()
+        for d in pcounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(pcounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['prefix'] = sscp
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    for k in ccounts:
+        sites = set()
+        for d in ccounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(ccounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['country'] = sscp
+    sscp = defaultdict(list) # num doms from same site where same client pair matched
+    for k in acounts:
+        sites = set()
+        for d in acounts[k]:
+            sites.update(spd[d])
+        for site in sites:
+            n = float(len(dpsr[site].intersection(acounts[k])))
+            d = float(len(dpsr[site]))
+            sscp[site].append((n, d)) # should probably show this as a scatter plot
+    sscp_out['asn'] = sscp
+    with open('same_site_client_pairs_prefix.json', 'w+') as f:
+        json.dump(sscp_out, f)
+
+
+def probability_curves():
+    with open('matches_24.json', 'r+') as f:
+        matches = json.load(f)['ip24']
+
+    counts = sorted([len(set(matches[k])) for k in matches])
+    i = 1
+    m = max(counts)
+    prev = len(counts)
+    subset = counts
+    vals = list()
+    while i < m:
+        prev = len(subset)
+        subset = [z for z in subset if z > i]
+        vals.append((i, float(len(subset)) / float(prev)))
+        i += 1
+    x, y = zip(*vals)
+    with open('given_n_24_cdf.json', 'w+') as f:
+        json.dump({'num_matches': x, 'fraction_with_more': y},f)
+
+
+
+
+
 
 
 
