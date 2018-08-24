@@ -361,5 +361,41 @@ def terminal(command):
                          stderr=subprocess.PIPE, shell=True)
     return p.communicate()
 
+'''
+class bigdata(object):
+    def __init__(rlen=1000, dataroot='bigdata/', init_type=list):
+        self.recent = set()
+        self.data = dict()
+        self.droot = dataroot
+        self.init_type = init_type
+        self.rlen = rlen
+    def fname(k):
+        return self.droot+str(k)+'.json'
+    def __getitem__(k):
+        if k in self.recent:
+            return self.data[k]
+        else:
+            fname = self.fname(k)
+            if isfile(fname):
+                with open(fname, 'r+') as f:
+                    self.data[k] = json.load(f)
+            else:
+                self.data[k] = self.init_type()
+            return self.data[k]
+    def __setitem__(k, v):
+        if k not in self.recent:
+            if len(self.recent) > self.rlen - 1:
+                tmp = self.recent.pop()
+                tmpf = self.fname(tmp)
+                with open(tmpf, 'w+') as f:
+                    json.dump(self.data[k], f)
+                del self.data[k]
+            self.recent.add(k)
+            self.data[k] = v
+            fname = self.fname(k)
+            with open(fname, 'w+') as f:
+                json.dump(self.data[k], f)
+'''
+
 
 datadir = format_dirpath(top_dir+'../data/')
