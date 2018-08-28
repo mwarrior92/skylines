@@ -3,9 +3,9 @@ imports raw experiment data
 '''
 from __future__ import print_function
 from ripe.atlas.cousteau import Probe
-from helpers import format_dirpath, mydir, isfile
+from helpers import format_dirpath, mydir, isfile, listfiles
 import json
-from collections import defaultdict
+from collections import defaultdict, Counter
 from statsmodels.distributions.empirical_distribution import ECDF
 from scipy.stats import iqr
 import numpy as np
@@ -15,6 +15,8 @@ from IPy import IP, IPSet
 import pyasn
 import inspect
 from datetime import datetime
+import itertools
+from multiprocessing import Pool, Manager
 
 
 ################### SET UP GLOBALS ######################
@@ -157,13 +159,101 @@ def is_public(i):
         pass
     return False
 
+def probe_cache(cid, fpath='probe_cache/'):
+    global cached_probes
+    global fcached_probes
+    fnum = cid / 1000
+    fpath = format_dirpath(fpath)
+    fname = fpath+'pc'+str(fnum)+'.json'
+    ret = None
+    if cid in cached_probes:
+        with open(fnum, 'r+') as f:
+            pc = json.load(f)
+            ret = pc[cid]
+    else:
+        if isfile(fname):
+            with open(fname, 'r+') as f:
+                pc = json.load(f)
+        else:
+            pc = dict()
+            try:
+                pc[cid] = Probe(id=cid)
+                ret = pc[cid]
+            except:
+                print('failed to get '+cid)
+        if cid in pc:
+            cached_probes.add(cid)
+            with open(fname, 'w+') as f:
+                json.dump(pc, f)
+            with open(fcached_probes, 'w+') as f:
+                json.dump(list(cached_probes), f)
+    if ret is None:
+        raise Exception('failed to get client info')
+    else:
+        return ret
 
-def get_prefix(ip):
+
+def get_client_info(ip, cid):
+    '''
+    NOTE: since this is being used for hashing, the output "ip" is actually the /24 prefix
+    '''
+    asn = None
+    prefix = None
+    try:
+        prb = probe_cache(cid)
+        country = prb.country_code
+        asn = prb.asn_v4
+        ptmp = prb.prefix_v4
+        if ptmp is not None and '/' in ptmp:
+            prefix = int(ptmp.split('/')[1])
+    except:
+        country = None
     try:
         prefix = int(asndb.lookup(ip)[1].split('/')[1])
     except:
-        prefix = 24
+        if prefix is None:
+            prefix = 24
+    try:
+        asn = int(asndb.lookup(ip)[0])
+    except:
+        pass
+    prefix = IP(ip).make_net(prefix).__str__()
+    ip = IP(ip).make_net(24).__str__().split('/')[0]
+
+    return {'country': country, 'prefix': prefix, 'asn': asn, 'ip': ip, 'id': cid}
+
+
+def get_prefix(ip, cid=-1):
+    prefix = 24
+    try:
+        prefix = int(asndb.lookup(ip)[1].split('/')[1])
+    except:
+        try:
+            prefix = probe_cache(cid).prefix_v4
+        except:
+            pass
     return IP(ip).make_net(prefix).__str__()
+
+
+def get_asn(ip, cid=-1):
+    asn = None
+    try:
+        asn = int(asndb.lookup(ip)[0])
+    except:
+        try:
+            asn = probe_cache(cid).asn_v4
+        except:
+            pass
+    return asn
+
+
+def get_country(cid):
+    try:
+        prb = probe_cache(cid)
+        country = prb.country_code
+    except:
+        country = None
+    return country
 
 
 def get_24(ip):
@@ -175,6 +265,42 @@ def get_24_list(l, k=None):
         return [get_24(z) for z in l if is_public(z)]
     else:
         return [get_24(z[k]) for z in l if is_public(z[k])]
+
+
+def agg_clients_raw(c):
+    tmp = list()
+    for z in c:
+        tmp.extend(z)
+    return set([z['src_addr'] for z in tmp if 'src_addr' in z and \
+        is_public(z['src_addr'])])
+
+
+def agg_clients_24(c):
+    tmp = list()
+    for z in c:
+        tmp.extend(z)
+    return set([get_24(z['src_addr']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
+
+
+def agg_clients_prefix(c):
+    tmp = list()
+    for z in c:
+        tmp.extend(z)
+    return set([get_prefix(z['src_addr'], z['probe']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
+
+
+def agg_clients_country(c):
+    tmp = list()
+    for z in c:
+        tmp.extend(z)
+    return set([get_country(z['probe']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
+
+
+def agg_clients_asn(c):
+    tmp = list()
+    for z in c:
+        tmp.extend(z)
+    return set([get_asn(z['src_addr'], z['probe']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
 
 
 def nums_per_ip(data):
@@ -255,312 +381,6 @@ per_ip_per_dom = {
         }
 
 
-def get_per_ip_per_dom():
-    print(inspect.stack()[0][3])
-    mclient = MongoClient()
-    db = mclient.skyline
-    coll = db.sam
-
-    global per_ip_per_dom
-
-    return pd.DataFrame.from_records(coll.aggregate([per_ip_per_dom], allowDiskUse=True))
-
-
-def probe_cache(cid, fpath='probe_cache/'):
-    global cached_probes
-    global fcached_probes
-    fnum = cid / 1000
-    fpath = format_dirpath(fpath)
-    fname = fpath+'pc'+str(fnum)+'.json'
-    ret = None
-    if cid in cached_probes:
-        with open(fnum, 'r+') as f:
-            pc = json.load(f)
-            ret = pc[cid]
-    else:
-        if isfile(fname):
-            with open(fname, 'r+') as f:
-                pc = json.load(f)
-        else:
-            pc = dict()
-            try:
-                pc[cid] = Probe(id=cid)
-                ret = pc[cid]
-            except:
-                print('failed to get '+cid)
-        if cid in pc:
-            cached_probes.add(cid)
-            with open(fname, 'w+') as f:
-                json.dump(pc, f)
-            with open(fcached_probes, 'w+') as f:
-                json.dump(list(cached_probes), f)
-    if ret is None:
-        raise Exception('failed to get client info')
-    else:
-        return ret
-
-
-def get_client_info(ip, cid):
-    '''
-    NOTE: since this is being used for hashing, the output "ip" is actually the /24 prefix
-    '''
-    asn = None
-    prefix = None
-    try:
-        prb = probe_cache(cid)
-        country = prb.country_code
-        asn = prb.asn_v4
-        ptmp = prb.prefix_v4
-        if ptmp is not None and '/' in ptmp:
-            prefix = int(ptmp.split('/')[1])
-    except:
-        country = None
-    try:
-        prefix = int(asndb.lookup(ip)[1].split('/')[1])
-    except:
-        if prefix is None:
-            prefix = 24
-    try:
-        asn = int(asndb.lookup(ip)[0])
-    except:
-        pass
-    prefix = IP(ip).make_net(prefix).__str__()
-    ip = IP(ip).make_net(24).__str__().split('/')[0]
-
-    return {'country': country, 'prefix': prefix, 'asn': asn, 'ip': ip, 'id': cid}
-
-
-def agg_clients(c):
-    tmp = list()
-    for z in c:
-        tmp.extend(z)
-    return [z for z in tmp if 'src_addr' in z and is_public(z['src_addr'])]
-
-
-def same_nth_24_prob_per_client_pair(data):
-    print(inspect.stack()[0][3])
-    with open('sites_per_dom.json', 'r+') as f:
-        spd = json.load(f)
-    with open('doms_per_site.json', 'r+') as f:
-        dps = json.load(f)
-    tmp = data._id.apply(lambda z: 'dst_addr' in z and is_public(z['dst_addr']))
-    tmp = data.loc[tmp]
-    print('binning')
-    tmp['ip24'] = tmp._id.apply(lambda z: get_24(z['dst_addr']))
-    tmp['domain'] = tmp._id.apply(lambda z: z['domain'])
-    binned24 = tmp.groupby(['ip24', 'domain']).agg({'clients': agg_clients})
-
-    ##########
-
-    rcounts = defaultdict(list) # raw IP
-    all_clients = set()
-    for _, row in binned24.iterrows():
-        print(str(row.name)+' '+str(len(row.clients))+' '+str(datetime.now()))
-        clients = row.clients
-        for i, a in enumerate(clients[:-1]):
-            A = get_client_info(a['src_addr'], a['probe'])
-            all_clients.add(A['ip'])
-            for b in clients[i+1:]:
-                B = get_client_info(b['src_addr'], b['probe'])
-                rcounts[str(tuple(sorted([A['ip'], B['ip']])))].append(row.name[1])
-        try:
-            all_clients.add(B['ip'])
-        except UnboundLocalError:
-            pass
-    with open('matches_24.json', 'w+') as f:
-        json.dump(rcounts, f)
-    with open('all_clients.json', 'w+') as f:
-        json.dump(list(all_clients), f)
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    dpsr = dict()
-    doms = set(tmp.domain.tolist())
-    for s in dps:
-        dpsr[s] = set(dps[s]).intersection(doms)
-    for k in rcounts:
-        sites = set()
-        for d in rcounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(rcounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    with open('same_site_client_pairs24.json', 'w+') as f:
-        json.dump(sscp, f)
-
-'''
-def same_nth_ip_prob(data):
-    print(inspect.stack()[0][3])
-    with open('sites_per_dom.json', 'r+') as f:
-        spd = json.load(f)
-    with open('doms_per_site.json', 'r+') as f:
-        dps = json.load(f)
-    tmp = data._id.apply(lambda z: 'dst_addr' in z and is_public(z['dst_addr']))
-    tmp = data.loc[tmp]
-    print('binning')
-    tmp['ip24'] = tmp._id.apply(lambda z: get_24(z['dst_addr']))
-    tmp['prefix'] = tmp._id.apply(lambda z: get_prefix(z['dst_addr']))
-    tmp['domain'] = tmp._id.apply(lambda z: z['domain'])
-    binned24 = tmp.groupby(['ip24', 'domain']).agg({'clients': agg_clients})
-    binnedprefix = tmp.groupby(['prefix', 'domain']).agg({'clients': agg_clients})
-
-    ##########
-
-    rcounts = defaultdict(list) # raw IP
-    pcounts = defaultdict(list) # prefix
-    ccounts = defaultdict(list) # country
-    acounts = defaultdict(list) # asn
-    all_clients = set()
-    all_prefixes = set()
-    all_countries = set()
-    all_asns = set()
-    for _, row in binned24.iterrows():
-        print(str(row.name)+' '+str(len(row.clients))+' '+str(datetime.now()))
-        clients = row.clients
-        for i, a in enumerate(clients[:-1]):
-            if i % 100 == 0 and i > 1:
-                print(str(i),end=',')
-            A = get_client_info(a['src_addr'], a['probe'])
-            all_clients.add(A['ip'])
-            all_countries.add(A['country'])
-            all_asns.add(A['asn'])
-            all_prefixes.add(A['prefix'])
-            for b in clients[i+1:]:
-                B = get_client_info(b['src_addr'], b['probe'])
-                rcounts[str(tuple(sorted([A['ip'], B['ip']])))].append(row.name[1])
-                ccounts[str(tuple(sorted([A['country'], B['country']])))].append(row.name[1])
-                pcounts[str(tuple(sorted([A['prefix'], B['prefix']])))].append(row.name[1])
-                acounts[str(tuple(sorted([A['asn'], B['asn']])))].append(row.name[1])
-        try:
-            all_clients.add(B['ip'])
-            all_countries.add(B['country'])
-            all_asns.add(B['asn'])
-            all_prefixes.add(B['prefix'])
-        except UnboundLocalError:
-            pass
-    with open('matches_24.json', 'w+') as f:
-        json.dump({'asn': acounts, 'country': ccounts, 'prefix': pcounts, 'ip24': rcounts}, f)
-    with open('all_clients.json', 'w+') as f:
-        json.dump({'all_clients': list(all_clients), 'all_countries': list(all_countries),
-            'all_asns': list(all_asns), 'all_prefixes': list(all_prefixes)}, f)
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    dpsr = dict()
-    doms = set(tmp.domain.tolist())
-    sscp_out = dict()
-    for s in dps:
-        dpsr[s] = set(dps[s]).intersection(doms)
-    for k in rcounts:
-        sites = set()
-        for d in rcounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(rcounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['ip24'] = sscp
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    for k in pcounts:
-        sites = set()
-        for d in pcounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(pcounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['prefix'] = sscp
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    for k in ccounts:
-        sites = set()
-        for d in ccounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(ccounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['country'] = sscp
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    for k in acounts:
-        sites = set()
-        for d in acounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(acounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['asn'] = sscp
-    with open('same_site_client_pairs24.json', 'w+') as f:
-        json.dump(sscp_out, f)
-
-    ##########
-
-    rcounts = defaultdict(list) # raw IP
-    pcounts = defaultdict(list) # prefix
-    ccounts = defaultdict(list) # country
-    acounts = defaultdict(list) # asn
-    for _, row in binnedprefix.iterrows():
-        print(row.name)
-        clients = row.clients
-        for i, a in enumerate(clients[:-1]):
-            A = get_client_info(a['src_addr'], a['probe'])
-            for b in clients[i+1:]:
-                B = get_client_info(b['src_addr'], b['probe'])
-                rcounts[str(tuple(sorted([A['ip'], B['ip']])))].append(row.name[1])
-                ccounts[str(tuple(sorted([A['country'], B['country']])))].append(row.name[1])
-                pcounts[str(tuple(sorted([A['prefix'], B['prefix']])))].append(row.name[1])
-                acounts[str(tuple(sorted([A['asn'], B['asn']])))].append(row.name[1])
-    with open('matches_prefix.json', 'w+') as f:
-        json.dump({'asn': acounts, 'country': ccounts, 'prefix': pcounts, 'ipp': rcounts}, f)
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    dpsr = defaultdict(set)
-    doms = set(tmp.domain.tolist())
-    sscp_out = dict()
-    for d in dps:
-        if d in doms:
-            dpsr[site].add(d)
-    for k in rcounts:
-        sites = set()
-        for d in rcounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(rcounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['ip24'] = sscp
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    for k in pcounts:
-        sites = set()
-        for d in pcounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(pcounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['prefix'] = sscp
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    for k in ccounts:
-        sites = set()
-        for d in ccounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(ccounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['country'] = sscp
-    sscp = defaultdict(list) # num doms from same site where same client pair matched
-    for k in acounts:
-        sites = set()
-        for d in acounts[k]:
-            sites.update(spd[d])
-        for site in sites:
-            n = float(len(dpsr[site].intersection(acounts[k])))
-            d = float(len(dpsr[site]))
-            sscp[site].append((n, d)) # should probably show this as a scatter plot
-    sscp_out['asn'] = sscp
-    with open('same_site_client_pairs_prefix.json', 'w+') as f:
-        json.dump(sscp_out, f)
-
-'''
-
-
 def probability_curves():
     print(inspect.stack()[0][3])
     with open('matches_24.json', 'r+') as f:
@@ -580,12 +400,6 @@ def probability_curves():
     x, y = zip(*vals)
     with open('given_n_24_cdf.json', 'w+') as f:
         json.dump({'num_matches': x, 'fraction_with_more': y},f)
-
-
-
-
-
-
 
 
 per_ip_per_client = {
@@ -646,16 +460,24 @@ def get_per_domain():
 
 per_client = {
         '$group': {
-            '_id': { 'src_addr': '$from' },
-            'clients': {
+            '_id': '$from',
+            'local': {
+                '$push': '$src_addr',
+                },
+            'results': {
                 '$push': {
-                    'domain': '$dst_name',
-                    'probe': '$prb_id',
-                    'local': '$src_addr',
-                    'id': '$_id',
-                    'timestamp': '$timestamp',
-                    'dst_addr': '$dst_addr'
+                    'dst_addr': '$dst_addr',
+                    'domain': '$dst_name'
                     }
+                },
+            'rcvd': {
+                '$push': '$rcvd'
+                },
+            'entry_id': {
+                '$push': '$_id'
+                },
+            'probe': {
+                '$first': '$prb_id',
                 }
             }
         }
@@ -671,12 +493,141 @@ def get_per_client():
     return pd.DataFrame.from_records(coll.aggregate([per_client], allowDiskUse=True))
 
 
+def shorten_results(r, fname='singles.json'):
+    '''
+    reduce to results that are 1) valid / public and 2) from sites with more than one
+    /24 result
+    '''
+    with open(fname, 'r+') as f:
+        singles = json.load(f)
+    return [(get_24(z['dst_addr']), z['domain']) for z in r \
+            if 'dst_addr' in z and 'domain' in z and \
+            is_public(z['dst_addr']) and z['domain'] not in singles]
+
+
+def is_resolved(row):
+    ips, doms = zip(*row['results'])
+    if len(set(ips)) > 1: # if it has more than one subnet in results, seems legit
+        return True
+    elif ips[0] == row['ip24']: # one subnet and matches self subnet -> bad
+        return False
+    elif len(set(doms)) < 4: # if only tested few doms, benefit of doubt (maybe same CDN)
+        return True
+    else: # if it's a lot of doms, assume bogus
+        return False
+
+
+def get_clients(data=None):
+    print(inspect.stack()[0][3])
+    if data is None:
+        data = get_per_client()
+    print('getting only clients with real IP addresses')
+    tmp = data._id.apply(lambda z: is_public(z))
+    tmp = data.loc[tmp]
+    # get rid of things that didn't resolve
+    tmp.results = tmp.results.apply(lambda z: shorten_results(z))
+    # get rid of clients with no results
+    tmp = tmp.loc[tmp.results.apply(lambda z: sum([len(i) for i in z]) > 0)]
+    tmp = tmp.assign(pinfo=tmp.set_index(['_id', 'probe']).index.tolist())
+    print('creating group labels')
+    tmp = tmp.assign(ip24=tmp._id.apply(lambda z: get_24(z)))
+    resolved = tmp.apply(is_resolved, axis=1)
+    tmp = tmp.loc[resolved] # get rid of clients that didn't actually resolve stuff
+    tmp = tmp.assign(prefix=tmp.pinfo.apply(lambda z: get_prefix(*z)))
+    tmp = tmp.assign(country=tmp.pinfo.apply(lambda z: get_country(z[1])))
+    tmp = tmp.assign(asn=tmp.pinfo.apply(lambda z: get_asn(*z)))
+    tmp = tmp.assign(domains=tmp.results.apply(lambda z: set([i[1] for i in z])))
+    tmp = tmp.rename(index=str, columns={'_id': 'src_addr'})
+    return tmp
+
+def dump_client_stuff(clients=None):
+    if clients is None:
+        clients = get_clients()
+    data = clients.apply(lambda z: (z['domains'], z['src_addr']))
+    with open('clientdata.json', 'w+') as f:
+        json.dump(data, f)
+    return data
+
+
+def get_per_ip_per_dom():
+    print(inspect.stack()[0][3])
+    mclient = MongoClient()
+    db = mclient.skyline
+    coll = db.sam
+
+    global per_ip_per_dom
+
+    return pd.DataFrame.from_records(coll.aggregate([per_ip_per_dom], allowDiskUse=True))
+
+
+def get_ipdoms(data=None):
+    print(inspect.stack()[0][3])
+    if data is None:
+        data = get_per_ip_per_dom()
+    tmp = data._id.apply(lambda z: 'dst_addr' in z and is_public(z['dst_addr']))
+    tmp = data.loc[tmp]
+    print('getting labels')
+    tmp = tmp.assign(ip24=tmp._id.apply(lambda z: get_24(z['dst_addr'])))
+    tmp = tmp.assign(domain=tmp._id.apply(lambda z: z['domain']))
+    tmp = tmp.assign(res_24=tmp._id.apply(lambda z: (get_24(z['dst_addr']), z['domain'])))
+    # reduce to domains that actually resolve multiple destinations
+    print('filtering non-multiplexed')
+    multi = tmp.groupby('domain').ip24.nunique()
+    tmp = tmp.loc[tmp.domain.apply(lambda z: multi[z] > 1)]
+    singles = [z for z in list(multi.index) if multi[z] == 1]
+    with open('singles.json', 'w+') as f:
+        json.dump(singles, f)
+    multi = sorted([(z, multi[z]) for z in list(multi.index) if multi[z] > 1], key=lambda z: z[1])
+    with open('multi.json', 'w+') as f:
+        json.dump(multi, f)
+    tmp = tmp.assign(res_prefix=tmp._id.apply(lambda z: (get_prefix(z['dst_addr']), z['domain'])))
+    # tmp = tmp.set_index(['ip24', 'domain']) # .agg({'clients': agg_clients})
+    return tmp
+
+
+def count_24_matches_raw_clients(clients=None, ipdoms=None):
+    if clients is None:
+        clients = get_clients()
+    if ipdoms is None:
+        ipdoms = get_ipdoms()
+    ipdoms = ipdoms.groupby('res_24').agg({'clients': agg_clients_raw})
+    print('iterating through client results')
+    outdir = format_dirpath(mydir()+'matches')
+    for i, client in clients.iterrows():
+        print(client.src_addr)
+        checked = set()
+        matches = list()
+        for res in client.results:
+            if res[1] in checked:
+                continue
+            matches.extend(ipdoms.loc[[res]].clients.iloc[0])
+            checked.add(res[1])
+        matches = Counter(matches).most_common()
+        with open(outdir+client.src_addr+'.json', 'w+') as f:
+            json.dump(matches, f)
+    # if it freaks out again I'm just going to write the file per client
+    with open('raw_clients_24_counts.json', 'w+') as f:
+        json.dump(matches, f)
+
+
+def calc_counts_craw_d24(clients=None, ipdoms=None):
+    if clients is None:
+        clients = get_clients()
+    if ipdoms is None:
+        ipdoms = get_ipdoms()
+    ipdoms = ipdoms.groupby('res_24').agg({'clients': agg_clients_raw})
+    outdir = format_dirpath(mydir()+'matches2')
+    for i, c in clients.iloc[:-1].iterrows():
+        for j, c in clients.iloc[i+1:].iterrows():
+            pass
+
+
+
+
 ################### NUMBER IPs PER DOMAIN
 
 
 ################### DOMAIN OVERLAP
 
 if __name__ == "__main__":
-    sites_covered()
-    distinct_links()
     get_per_ip()
