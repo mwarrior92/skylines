@@ -2,7 +2,6 @@
 imports raw experiment data
 '''
 from __future__ import print_function
-from ripe.atlas.cousteau import Probe
 from helpers import format_dirpath, mydir, isfile, listfiles
 import json
 from collections import defaultdict, Counter
@@ -11,19 +10,18 @@ from scipy.stats import iqr
 import numpy as np
 import pandas as pd
 from pymongo import MongoClient
-from IPy import IP, IPSet
-import pyasn
 import inspect
 from datetime import datetime
 import itertools
 from multiprocessing import Pool, Manager
+from surveyor import get_individual_closeness
+from reformatting import *
 
 
 ################### SET UP GLOBALS ######################
 topdir = format_dirpath(mydir()+"../")
 supportdir = format_dirpath(topdir+"support_files/")
 hardataf = format_dirpath(topdir+'data/parse_hars/')+'getlists.json'
-asndb = pyasn.pyasn('asndb.dat')
 fcached_probes = 'cached_probes.list'
 if isfile(fcached_probes):
     with open(fcached_probes, 'r+') as f:
@@ -149,158 +147,6 @@ def get_per_ip():
     global per_ip
 
     return pd.DataFrame.from_records(coll.aggregate([per_ip], allowDiskUse=True))
-
-
-def is_public(i):
-    try:
-        ip = IP(i)
-        return ip.iptype() == 'PUBLIC'
-    except:
-        pass
-    return False
-
-def probe_cache(cid, fpath='probe_cache/'):
-    global cached_probes
-    global fcached_probes
-    fnum = cid / 1000
-    fpath = format_dirpath(fpath)
-    fname = fpath+'pc'+str(fnum)+'.json'
-    ret = None
-    if cid in cached_probes:
-        with open(fnum, 'r+') as f:
-            pc = json.load(f)
-            ret = pc[cid]
-    else:
-        if isfile(fname):
-            with open(fname, 'r+') as f:
-                pc = json.load(f)
-        else:
-            pc = dict()
-            try:
-                pc[cid] = Probe(id=cid)
-                ret = pc[cid]
-            except:
-                print('failed to get '+cid)
-        if cid in pc:
-            cached_probes.add(cid)
-            with open(fname, 'w+') as f:
-                json.dump(pc, f)
-            with open(fcached_probes, 'w+') as f:
-                json.dump(list(cached_probes), f)
-    if ret is None:
-        raise Exception('failed to get client info')
-    else:
-        return ret
-
-
-def get_client_info(ip, cid):
-    '''
-    NOTE: since this is being used for hashing, the output "ip" is actually the /24 prefix
-    '''
-    asn = None
-    prefix = None
-    try:
-        prb = probe_cache(cid)
-        country = prb.country_code
-        asn = prb.asn_v4
-        ptmp = prb.prefix_v4
-        if ptmp is not None and '/' in ptmp:
-            prefix = int(ptmp.split('/')[1])
-    except:
-        country = None
-    try:
-        prefix = int(asndb.lookup(ip)[1].split('/')[1])
-    except:
-        if prefix is None:
-            prefix = 24
-    try:
-        asn = int(asndb.lookup(ip)[0])
-    except:
-        pass
-    prefix = IP(ip).make_net(prefix).__str__()
-    ip = IP(ip).make_net(24).__str__().split('/')[0]
-
-    return {'country': country, 'prefix': prefix, 'asn': asn, 'ip': ip, 'id': cid}
-
-
-def get_prefix(ip, cid=-1):
-    prefix = 24
-    try:
-        prefix = int(asndb.lookup(ip)[1].split('/')[1])
-    except:
-        try:
-            prefix = probe_cache(cid).prefix_v4
-        except:
-            pass
-    return IP(ip).make_net(prefix).__str__()
-
-
-def get_asn(ip, cid=-1):
-    asn = None
-    try:
-        asn = int(asndb.lookup(ip)[0])
-    except:
-        try:
-            asn = probe_cache(cid).asn_v4
-        except:
-            pass
-    return asn
-
-
-def get_country(cid):
-    try:
-        prb = probe_cache(cid)
-        country = prb.country_code
-    except:
-        country = None
-    return country
-
-
-def get_24(ip):
-    return IP(ip).make_net(24).__str__()
-
-
-def get_24_list(l, k=None):
-    if k is None:
-        return [get_24(z) for z in l if is_public(z)]
-    else:
-        return [get_24(z[k]) for z in l if is_public(z[k])]
-
-
-def agg_clients_raw(c):
-    tmp = list()
-    for z in c:
-        tmp.extend(z)
-    return set([z['src_addr'] for z in tmp if 'src_addr' in z and \
-        is_public(z['src_addr'])])
-
-
-def agg_clients_24(c):
-    tmp = list()
-    for z in c:
-        tmp.extend(z)
-    return set([get_24(z['src_addr']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
-
-
-def agg_clients_prefix(c):
-    tmp = list()
-    for z in c:
-        tmp.extend(z)
-    return set([get_prefix(z['src_addr'], z['probe']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
-
-
-def agg_clients_country(c):
-    tmp = list()
-    for z in c:
-        tmp.extend(z)
-    return set([get_country(z['probe']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
-
-
-def agg_clients_asn(c):
-    tmp = list()
-    for z in c:
-        tmp.extend(z)
-    return set([get_asn(z['src_addr'], z['probe']) for z in tmp if 'src_addr' in z and is_public(z['src_addr'])])
 
 
 def nums_per_ip(data):
@@ -493,30 +339,6 @@ def get_per_client():
     return pd.DataFrame.from_records(coll.aggregate([per_client], allowDiskUse=True))
 
 
-def shorten_results(r, fname='singles.json'):
-    '''
-    reduce to results that are 1) valid / public and 2) from sites with more than one
-    /24 result
-    '''
-    with open(fname, 'r+') as f:
-        singles = json.load(f)
-    return [(get_24(z['dst_addr']), z['domain']) for z in r \
-            if 'dst_addr' in z and 'domain' in z and \
-            is_public(z['dst_addr']) and z['domain'] not in singles]
-
-
-def is_resolved(row):
-    ips, doms = zip(*row['results'])
-    if len(set(ips)) > 1: # if it has more than one subnet in results, seems legit
-        return True
-    elif ips[0] == row['ip24']: # one subnet and matches self subnet -> bad
-        return False
-    elif len(set(doms)) < 4: # if only tested few doms, benefit of doubt (maybe same CDN)
-        return True
-    else: # if it's a lot of doms, assume bogus
-        return False
-
-
 def get_clients(data=None):
     print(inspect.stack()[0][3])
     if data is None:
@@ -533,20 +355,144 @@ def get_clients(data=None):
     tmp = tmp.assign(ip24=tmp._id.apply(lambda z: get_24(z)))
     resolved = tmp.apply(is_resolved, axis=1)
     tmp = tmp.loc[resolved] # get rid of clients that didn't actually resolve stuff
+    tmp.entry_id = tmp.entry_id.apply(lambda z: [str(i) for i in z])
     tmp = tmp.assign(prefix=tmp.pinfo.apply(lambda z: get_prefix(*z)))
+    print('got prefixes')
     tmp = tmp.assign(country=tmp.pinfo.apply(lambda z: get_country(z[1])))
+    print('got countries')
     tmp = tmp.assign(asn=tmp.pinfo.apply(lambda z: get_asn(*z)))
+    print('got ASNs')
     tmp = tmp.assign(domains=tmp.results.apply(lambda z: set([i[1] for i in z])))
+    print('got domains')
     tmp = tmp.rename(index=str, columns={'_id': 'src_addr'})
+    tmp.to_pickle('get_clients.pkl')
+    print('got clients')
     return tmp
 
-def dump_client_stuff(clients=None):
-    if clients is None:
-        clients = get_clients()
-    data = clients.apply(lambda z: (z['domains'], z['src_addr']))
-    with open('clientdata.json', 'w+') as f:
-        json.dump(data, f)
+
+class grab_row(object):
+    def __init__(self, i, args):
+        self.args = args
+        self.i = i
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        try:
+            return tuple(self.args + [self.i.next()])
+        except StopIteration:
+            raise StopIteration
+
+
+def make_result_to_num_mapping(data=None, update_clients=True, fname0='get_clients.pkl',
+fname='mapped_clients.pkl', workers=4):
+    '''
+    change doms and answers into numbers so matching will be more efficient
+    '''
+
+    if data is None:
+        # data = get_clients()
+        data = pd.read_pickle(fname0)
+    m = Manager()
+    p = Pool(workers)
+    doms = m.dict()
+    idoms = m.dict()
+    ips = m.dict()
+    iips = m.dict()
+    l1 = m.Lock()
+    l2 = m.Lock()
+    ret = data
+    rows = data.iterrows()
+    args = grab_row(rows, [doms, idoms, ips, iips, l1, l2])
+    for i, tmp in p.imap_unordered(map_the_clients, args):
+        ret.loc[i].results = tmp
+
+    with open('ip_mapping.json', 'w+') as f:
+        json.dump({'ip2i': dict(ips), 'i2ip':dict(iips)}, f)
+
+    with open('dom_mapping.json', 'w+') as f:
+        json.dump({'dom2i': dict(doms), 'i2dom':dict(idoms)}, f)
+
+    ret.to_pickle(fname)
+    return ret
+
+
+def get_client_24_groups(data=None):
+    if data is None:
+        data = make_result_to_num_mapping()
+    data = data.groupby('ip24', as_index=False).agg({'results': merge_dicts,
+                                                    'src_addr': lambda z: list(z),
+                                                    'probe': lambda z: set(z)})
+    # filter for only groups that have more than one client
+    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
     return data
+
+
+def get_client_asn_groups(data=None):
+    if data is None:
+        data = make_result_to_num_mapping()
+    data = data.groupby('asn', as_index=False).agg({'results': merge_dicts,
+                                                    'src_addr': lambda z: list(z),
+                                                    'probe': lambda z: set(z)})
+    # filter for only groups that have more than one client
+    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
+    return data
+
+
+def get_client_country_groups(data=None):
+    if data is None:
+        data = make_result_to_num_mapping()
+    data = data.groupby('country', as_index=False).agg({'results': merge_dicts,
+                                                    'src_addr': lambda z: list(z),
+                                                    'probe': lambda z: set(z)})
+    # filter for only groups that have more than one client
+    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
+    return data
+
+
+def get_client_prefix_groups(data=None):
+    if data is None:
+        data = make_result_to_num_mapping()
+    data = data.groupby('prefix', as_index=False).agg({'results': merge_dicts,
+                                                    'src_addr': lambda z: list(z),
+                                                    'probe': lambda z: set(z)})
+    # filter for only groups that have more than one client
+    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
+    return data
+
+
+class client_grabber(object):
+    def __init__(self, data, k, total):
+        self.data = data
+        self.data.index = data[k]
+        self.total = total
+        self.i = itertools.combinations(range(len(data[k])), 2)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        try:
+            tmp = self.i.next()
+            a = self.data.iloc[tmp[0]]
+            b = self.data.iloc[tmp[1]]
+            return (a.results, b.results, a.name, b.name, self.total)
+        except StopIteration:
+            raise StopIteration
+
+
+def get_raw_distances(data=None, make_maoping=True, procs=4, domtotal=302,
+        fname='raw_distances.json', fname0='mapped_clients.pkl'):
+    if data is None or make_mapping:
+        data = pd.read_pickle(fname0)
+    pool = Pool(procs)
+    cgrabber = client_grabber(data, 'src_addr', domtotal)
+    print('iterating for raw distances...')
+    for v, a, b in pool.imap_unordered(get_individual_closeness, cgrabber):
+        print(str([v,a,b]))
+        with open(fname, 'a+') as f:
+            f.write(json.dumps([v, str(a), str(b)])+"\n")
 
 
 def get_per_ip_per_dom():
@@ -630,4 +576,4 @@ def calc_counts_craw_d24(clients=None, ipdoms=None):
 ################### DOMAIN OVERLAP
 
 if __name__ == "__main__":
-    get_per_ip()
+    get_raw_distances()
