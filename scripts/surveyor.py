@@ -8,16 +8,17 @@ def individuals_closeness(a, b):
         (a n b) / (b u a)
         '''
         # minimize iteration
-        if len(a) < len(b):
-            aips, bips = zip(*[(a[z], b[z]) for z in a.keys()])
+        keys = set(a.keys()).intersection(set(b.keys()))
+        if len(keys) > 0:
+            aips, bips = zip(*[(a[z], b[z]) for z in keys])
+            n = float(len(set(aips).intersection(bips)))
+            d = float(len(aips))
+            return (n/d, d)
         else:
-            aips, bips = zip(*[(a[z], b[z]) for z in b.keys()])
-        n = float(len(aips.intersection(bips)))
-        d = float(len(aips))
-        return (n/d, d)
+            return (-1, 1)
 
 
-def get_individual_closeness(a, b, aid, bid, domtotal):
+def get_individual_closeness((a, b, aid, bid, domtotal)):
     nd, d = individuals_closeness(a,b)
     w = weight_by_doms(d, domtotal)
     return (nd*w, aid, bid)

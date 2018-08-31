@@ -198,7 +198,7 @@ def merge_dicts(ld):
     return outd
 
 
-def map_the_clients((doms, idoms, ips, iips, l1, l2), r):
+def map_the_clients((doms, idoms, ips, iips, l1, l2, r)):
     i, row = r
     print(i)
     tmp = dict()

@@ -406,7 +406,8 @@ fname='mapped_clients.pkl', workers=4):
     rows = data.iterrows()
     args = grab_row(rows, [doms, idoms, ips, iips, l1, l2])
     for i, tmp in p.imap_unordered(map_the_clients, args):
-        ret.loc[i].results = tmp
+        print(i)
+        ret.at[i,'results'] = tmp
 
     with open('ip_mapping.json', 'w+') as f:
         json.dump({'ip2i': dict(ips), 'i2ip':dict(iips)}, f)
@@ -485,14 +486,18 @@ class client_grabber(object):
 def get_raw_distances(data=None, make_maoping=True, procs=4, domtotal=302,
         fname='raw_distances.json', fname0='mapped_clients.pkl'):
     if data is None or make_mapping:
-        data = pd.read_pickle(fname0)
+        try:
+            data = pd.read_pickle(fname0)
+        except:
+            data = make_result_to_num_mapping()
     pool = Pool(procs)
     cgrabber = client_grabber(data, 'src_addr', domtotal)
     print('iterating for raw distances...')
     for v, a, b in pool.imap_unordered(get_individual_closeness, cgrabber):
-        print(str([v,a,b]))
-        with open(fname, 'a+') as f:
-            f.write(json.dumps([v, str(a), str(b)])+"\n")
+        if v >= 0:
+            print(str([v,a,b]))
+            with open(fname, 'a+') as f:
+                f.write(json.dumps([v, str(a), str(b)])+"\n")
 
 
 def get_per_ip_per_dom():
