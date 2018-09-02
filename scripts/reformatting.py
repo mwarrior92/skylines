@@ -5,13 +5,21 @@ from ripe.atlas.cousteau import Probe
 from IPy import IP
 from collections import defaultdict
 asndb = pyasn.pyasn('asndb.dat')
+fcached_probes = 'cached_probes.list'
+if isfile(fcached_probes):
+    with open(fcached_probes, 'r+') as f:
+        cached_probes = set(json.load(f))
+else:
+    cached_probes = set()
+
 
 
 def is_public(i):
     try:
         ip = IP(i)
         return ip.iptype() == 'PUBLIC'
-    except:
+    except Exception as e:
+        print(e)
         pass
     return False
 
@@ -20,10 +28,12 @@ def get_prefix(ip, cid=-1):
     prefix = 24
     try:
         prefix = int(asndb.lookup(ip)[1].split('/')[1])
-    except:
+    except Exception as e:
+        print(e)
         try:
-            prefix = probe_cache(cid).prefix_v4
-        except:
+            prefix = int(probe_cache(cid)['prefix'].split('/')[1])
+        except Exception as e:
+            print(e)
             pass
     return IP(ip).make_net(prefix).__str__()
 
@@ -35,27 +45,29 @@ def probe_cache(cid, fpath='probe_cache/'):
     fpath = format_dirpath(fpath)
     fname = fpath+'pc'+str(fnum)+'.json'
     ret = None
-    if cid in cached_probes:
-        with open(fnum, 'r+') as f:
+    scid = str(cid)
+    if isfile(fname):
+        with open(fname, 'r+') as f:
             pc = json.load(f)
-            ret = pc[cid]
-    else:
-        if isfile(fname):
-            with open(fname, 'r+') as f:
-                pc = json.load(f)
-        else:
-            pc = dict()
-            try:
-                pc[cid] = Probe(id=cid)
-                ret = pc[cid]
-            except:
-                print('failed to get '+cid)
-        if cid in pc:
-            cached_probes.add(cid)
+            if scid in pc:
+                ret = pc[scid]
+    if ret is None:
+        pc = dict()
+        try:
+            tmp = Probe(id=cid)
+            pc[scid] = {'country': tmp.country_code,
+                    'asn': tmp.asn_v4,
+                    'prefix': tmp.prefix_v4}
+            ret = pc[scid]
+        except Exception as e:
+            print(e)
+            print('failed to get '+scid)
+        if scid in pc:
             with open(fname, 'w+') as f:
                 json.dump(pc, f)
             with open(fcached_probes, 'w+') as f:
                 json.dump(list(cached_probes), f)
+            cached_probes.add(cid)
     if ret is None:
         raise Exception('failed to get client info')
     else:
@@ -69,21 +81,24 @@ def get_client_info(ip, cid):
     prefix = None
     try:
         prb = probe_cache(cid)
-        country = prb.country_code
-        asn = prb.asn_v4
-        ptmp = prb.prefix_v4
+        country = prb['country']
+        asn = prb['asn']
+        ptmp = prb['prefix']
         if ptmp is not None and '/' in ptmp:
             prefix = int(ptmp.split('/')[1])
-    except:
+    except Exception as e:
+        print(e)
         country = None
     try:
         prefix = int(asndb.lookup(ip)[1].split('/')[1])
-    except:
+    except Exception as e:
+        print(e)
         if prefix is None:
             prefix = 24
     try:
         asn = int(asndb.lookup(ip)[0])
-    except:
+    except Exception as e:
+        print(e)
         pass
     prefix = IP(ip).make_net(prefix).__str__()
     ip = IP(ip).make_net(24).__str__().split('/')[0]
@@ -95,10 +110,12 @@ def get_asn(ip, cid=-1):
     asn = None
     try:
         asn = int(asndb.lookup(ip)[0])
-    except:
+    except Exception as e:
+        print(e)
         try:
-            asn = probe_cache(cid).asn_v4
-        except:
+            asn = probe_cache(cid)['asn']
+        except Exception as e:
+            print(e)
             pass
     return asn
 
@@ -106,8 +123,9 @@ def get_asn(ip, cid=-1):
 def get_country(cid):
     try:
         prb = probe_cache(cid)
-        country = prb.country_code
-    except:
+        country = prb['country']
+    except Exception as e:
+        print(e)
         country = None
     return country
 
@@ -190,17 +208,23 @@ def is_resolved(row):
         return False
 
 
+def merge_dicts2(ld):
+    outd = dict()
+    for d in ld:
+        outd.update(d)
+    return outd
+
+
 def merge_dicts(ld):
     outd = defaultdict(list)
     for d in ld:
         for k, v in d.iteritems():
             outd[k].append(v)
-    return outd
+    return dict(outd)
 
 
 def map_the_clients((doms, idoms, ips, iips, l1, l2, r)):
     i, row = r
-    print(i)
     tmp = dict()
     for k, v in row.results.iteritems():
         l1.acquire()

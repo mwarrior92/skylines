@@ -15,13 +15,13 @@ def individuals_closeness(a, b):
             d = float(len(aips))
             return (n/d, d)
         else:
-            return (-1, 1)
+            return (-1, 0)
 
 
 def get_individual_closeness((a, b, aid, bid, domtotal)):
     nd, d = individuals_closeness(a,b)
-    w = weight_by_doms(d, domtotal)
-    return (nd*w, aid, bid)
+    # w = weight_by_doms(d, domtotal)
+    return (nd, d, aid, bid)
 
 
 def weight_by_doms(domcount, domtotal):

@@ -22,12 +22,6 @@ from reformatting import *
 topdir = format_dirpath(mydir()+"../")
 supportdir = format_dirpath(topdir+"support_files/")
 hardataf = format_dirpath(topdir+'data/parse_hars/')+'getlists.json'
-fcached_probes = 'cached_probes.list'
-if isfile(fcached_probes):
-    with open(fcached_probes, 'r+') as f:
-        cached_probes = set(json.load(f))
-else:
-    cached_probes = set()
 
 ################### DOMAIN DATA COLLECTION ######################
 
@@ -115,10 +109,6 @@ def num_sites_covered_by_top_n_doms(fname='sites_per_dom.json'):
         json.dump(used_vs_covered, f)
 
 ################### DOMAIN DATA ANALYSIS ######################
-
-mclient = MongoClient()
-db = mclient.skyline
-data = db.sam
 
 per_ip = {
         '$group': {
@@ -336,13 +326,19 @@ def get_per_client():
 
     global per_client
 
-    return pd.DataFrame.from_records(coll.aggregate([per_client], allowDiskUse=True))
+    df = pd.DataFrame.from_records(coll.aggregate([per_client], allowDiskUse=True))
+    df.to_pickle('get_per_client.pkl')
+    return df
 
 
-def get_clients(data=None):
+def get_clients(data=None, fname0='get_per_client.pkl', fname='get_clients.pkl'):
     print(inspect.stack()[0][3])
     if data is None:
-        data = get_per_client()
+        try:
+            data = pd.read_pickle(fname0)
+        except Exception as e:
+            print(e)
+            data = get_per_client()
     print('getting only clients with real IP addresses')
     tmp = data._id.apply(lambda z: is_public(z))
     tmp = data.loc[tmp]
@@ -365,7 +361,7 @@ def get_clients(data=None):
     tmp = tmp.assign(domains=tmp.results.apply(lambda z: set([i[1] for i in z])))
     print('got domains')
     tmp = tmp.rename(index=str, columns={'_id': 'src_addr'})
-    tmp.to_pickle('get_clients.pkl')
+    tmp.to_pickle(fname)
     print('got clients')
     return tmp
 
@@ -392,8 +388,11 @@ fname='mapped_clients.pkl', workers=4):
     '''
 
     if data is None:
-        # data = get_clients()
-        data = pd.read_pickle(fname0)
+        try:
+            data = pd.read_pickle(fname0)
+        except Exception as e:
+            print(e)
+            data = get_clients()
     m = Manager()
     p = Pool(workers)
     doms = m.dict()
@@ -419,20 +418,48 @@ fname='mapped_clients.pkl', workers=4):
     return ret
 
 
-def get_client_24_groups(data=None):
+def get_client_probe_groups(data=None, fname='mapped_probes.pkl', fname0='mapped_clients.pkl'):
     if data is None:
-        data = make_result_to_num_mapping()
+        try:
+            data = pd.read_pickle(fname0)
+        except Exception as e:
+            print(e)
+            data = make_result_to_num_mapping()
+    data = data.groupby('probe', as_index=False).agg({'results': merge_dicts2,
+                                                    'src_addr': lambda z: set(z),
+                                                    'ip24': lambda z: set(z),
+                                                    'country': lambda z: set(z),
+                                                    'asn': lambda z: set(z),
+                                                    'prefix': lambda z: set(z)})
+    data.to_pickle(fname)
+    return data
+
+
+def get_client_24_groups(data=None, fname='mapped_24.pkl', fname0='mapped_clients.pkl'):
+    if data is None:
+        try:
+            data = pd.read_pickle(fname0)
+        except Exception as e:
+            print(e)
+            data = make_result_to_num_mapping()
     data = data.groupby('ip24', as_index=False).agg({'results': merge_dicts,
                                                     'src_addr': lambda z: list(z),
-                                                    'probe': lambda z: set(z)})
+                                                    'probe': lambda z: set(z),
+                                                    'country': lambda z: list(z)[0],
+                                                    'asn': lambda z: set(z),
+                                                    'prefix': lambda z: set(z)})
     # filter for only groups that have more than one client
     data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
     return data
 
 
-def get_client_asn_groups(data=None):
+def get_client_asn_groups(data=None, fname='mapped_asns.pkl', fname0='mapped_clients.pkl'):
     if data is None:
-        data = make_result_to_num_mapping()
+        try:
+            data = pd.read_pickle(fname0)
+        except Exception as e:
+            print(e)
+            data = make_result_to_num_mapping()
     data = data.groupby('asn', as_index=False).agg({'results': merge_dicts,
                                                     'src_addr': lambda z: list(z),
                                                     'probe': lambda z: set(z)})
@@ -441,18 +468,23 @@ def get_client_asn_groups(data=None):
     return data
 
 
-def get_client_country_groups(data=None):
+def get_client_country_groups(data=None, fname='mapped_country.pkl', fname0='mapped_clients.pkl'):
     if data is None:
-        data = make_result_to_num_mapping()
+        try:
+            data = pd.read_pickle(fname0)
+        except Exception as e:
+            print(e)
+            data = make_result_to_num_mapping()
     data = data.groupby('country', as_index=False).agg({'results': merge_dicts,
                                                     'src_addr': lambda z: list(z),
                                                     'probe': lambda z: set(z)})
     # filter for only groups that have more than one client
     data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
+    data.to_pickle(fname)
     return data
 
 
-def get_client_prefix_groups(data=None):
+def get_client_prefix_groups(data=None, fname='mapped_prefix.pkl', fname0='mapped_clients.pkl'):
     if data is None:
         data = make_result_to_num_mapping()
     data = data.groupby('prefix', as_index=False).agg({'results': merge_dicts,
@@ -483,21 +515,71 @@ class client_grabber(object):
             raise StopIteration
 
 
+def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302,
+        fname='probe_distances.json', fname0='mapped_probes.pkl'):
+    print(inspect.stack()[0][3])
+
+    print(inspect.stack()[0][3])
+    mclient = MongoClient()
+    db = mclient.skyline
+    coll = db.distances
+
+    if data is None or make_mapping:
+        try:
+            data = pd.read_pickle(fname0)
+        except Exception as e:
+            print(e)
+            data = get_client_probe_groups()
+    data.index = data.probe
+    pool = Pool(procs)
+    cgrabber = client_grabber(data, 'probe', domtotal)
+    print('iterating for raw distances...')
+    count = 0
+    recents = list()
+    for c, d, a, b in pool.imap_unordered(get_individual_closeness, cgrabber):
+        if c >= 0:
+            count += 1
+            atmp = data.loc[a]
+            btmp = data.loc[b]
+            mdat = {'probes': [atmp.probe, btmp.probe],
+                    'countries': [atmp.country, btmp.country],
+                    'asns': [list(atmp.asn), list(btmp.asn)],
+                    'prefixes': [list(atmp.prefix), list(btmp.prefix)],
+                    'ip24s': [list(atmp.ip24), list(btmp.ip24)],
+                    'dist': c,
+                    'ndoms': d}
+            with open(fname, 'a+') as f:
+                f.write(json.dumps(mdat)+"\n")
+            recents.append(mdat)
+            if count % 1000 == 0:
+                print([c, d])
+                coll.insert_many(recents)
+                recents = list()
+    if len(recents) > 0:
+        coll.insert_many(recents)
+
+
+
+
 def get_raw_distances(data=None, make_maoping=True, procs=4, domtotal=302,
         fname='raw_distances.json', fname0='mapped_clients.pkl'):
     if data is None or make_mapping:
         try:
             data = pd.read_pickle(fname0)
-        except:
+        except Exception as e:
+            print(e)
             data = make_result_to_num_mapping()
     pool = Pool(procs)
     cgrabber = client_grabber(data, 'src_addr', domtotal)
     print('iterating for raw distances...')
-    for v, a, b in pool.imap_unordered(get_individual_closeness, cgrabber):
-        if v >= 0:
-            print(str([v,a,b]))
+    count = 0
+    for c, d, a, b in pool.imap_unordered(get_individual_closeness, cgrabber):
+        if c >= 0:
+            count += 1
+            if count % 1000 == 0:
+                print([c, d])
             with open(fname, 'a+') as f:
-                f.write(json.dumps([v, str(a), str(b)])+"\n")
+                f.write(json.dumps([c, d, str(a), str(b)])+"\n")
 
 
 def get_per_ip_per_dom():
@@ -561,24 +643,10 @@ def count_24_matches_raw_clients(clients=None, ipdoms=None):
         json.dump(matches, f)
 
 
-def calc_counts_craw_d24(clients=None, ipdoms=None):
-    if clients is None:
-        clients = get_clients()
-    if ipdoms is None:
-        ipdoms = get_ipdoms()
-    ipdoms = ipdoms.groupby('res_24').agg({'clients': agg_clients_raw})
-    outdir = format_dirpath(mydir()+'matches2')
-    for i, c in clients.iloc[:-1].iterrows():
-        for j, c in clients.iloc[i+1:].iterrows():
-            pass
-
-
-
-
 ################### NUMBER IPs PER DOMAIN
 
 
 ################### DOMAIN OVERLAP
 
 if __name__ == "__main__":
-    get_raw_distances()
+    get_probe_distances()

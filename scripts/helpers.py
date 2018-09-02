@@ -135,9 +135,11 @@ def format_dirpath(path):
     EXACTLY what you want/need it to be.
     """
     dirs = path.split('/')
-    path = '/'
     if dirs[0] != "":
-        raise ValueError('relative path not allowed')
+        # raise ValueError('relative path not allowed')
+        path = ''
+    else:
+        path = '/'
     for d in dirs:
         # account for empty strings from split
         if d == '..':
