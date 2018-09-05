@@ -6,6 +6,8 @@ from IPy import IP
 from collections import defaultdict
 asndb = pyasn.pyasn('asndb.dat')
 fcached_probes = 'cached_probes.list'
+import numpy as np
+
 if isfile(fcached_probes):
     with open(fcached_probes, 'r+') as f:
         cached_probes = set(json.load(f))
@@ -57,7 +59,8 @@ def probe_cache(cid, fpath='probe_cache/'):
             tmp = Probe(id=cid)
             pc[scid] = {'country': tmp.country_code,
                     'asn': tmp.asn_v4,
-                    'prefix': tmp.prefix_v4}
+                    'prefix': tmp.prefix_v4,
+                    'coords': tmp.geometry['coordinates']}
             ret = pc[scid]
         except Exception as e:
             print(e)
@@ -118,6 +121,16 @@ def get_asn(ip, cid=-1):
             print(e)
             pass
     return asn
+
+
+def get_coords(cid):
+    try:
+        prb = probe_cache(cid)
+        coords = prb['coords']
+    except Exception as e:
+        print(e)
+        coords = None
+    return coords
 
 
 def get_country(cid):
@@ -239,3 +252,37 @@ def map_the_clients((doms, idoms, ips, iips, l1, l2, r)):
         l2.release()
         tmp[doms[k]] = ips[v]
     return (i, tmp)
+
+def simplify_pings(results):
+    ret = dict()
+    for z in results:
+        ret[z['domain']] = [d.popitem()[1] for d in z['ping']]
+    return ret
+
+
+def merge_pings(results):
+    ret = defaultdict(list)
+    for z in results:
+        for k, v in z.iteritems():
+            ret[k] += v
+    return dict(ret)
+
+
+def ping_medians(results):
+    ret = dict()
+    return [ret.update({k: np.median(v)}) for (k,v) in results.iteritems()]
+
+
+def pull_from_other_df(other, coll, default=None):
+    def real_func(k):
+        if k in other.index:
+            tmp = other.loc[k][coll]
+            if type(tmp) is set:
+                tmp = list(tmp)
+            return tmp
+        else:
+            return default
+    return real_func
+
+def sortnjoin(*a):
+    return '_'.join([str(z) for z in sorted(a)])

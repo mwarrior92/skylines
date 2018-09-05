@@ -15,6 +15,8 @@ from datetime import datetime
 import itertools
 from multiprocessing import Pool, Manager
 from surveyor import get_individual_closeness
+import geopy.distance
+from bson.objectid import ObjectId
 from reformatting import *
 
 
@@ -318,6 +320,70 @@ per_client = {
             }
         }
 
+
+def get_clients_with_pings():
+    print(inspect.stack()[0][3])
+    mclient = MongoClient()
+    db = mclient.skyline
+    coll = db.sam
+
+    match1 = {'$match': {'rcvd': 3}}
+    group1 = {'$group': {
+        '_id': '$prb_id',
+        'results': {'$push': {
+            'ping': '$result',
+            'domain': '$dst_name'}},
+        'IPs': {'$push': '$from'}
+        }}
+    cmds = [match1, group1]
+    try:
+        print('trying to read raw ping results dataframe from file')
+        df = pd.read_pickle('raw_results.pkl')
+    except:
+        print('pulling from mongo')
+        df = pd.DataFrame.from_records(coll.aggregate(cmds, allowDiskUse=True))
+        print('pickling')
+        df.to_pickle('raw_results.pkl')
+    print(df.iloc[0])
+    print('simplifying pings')
+    df.results = df.results.apply(simplify_pings)
+    print(df.iloc[0])
+    print('getting ping medians')
+    df.ping_medians = df.results.apply(ping_medians)
+    print(df.iloc[0])
+    print('getting other columns')
+    df = df.rename(index=str, columns={'_id': 'probe'})
+    df.index = df.probe
+    tmp = pd.read_pickle('mapped_probes.pkl')
+    tmp.index = tmp.probe
+    df = df.assign(country=df.probe.apply(pull_from_other_df(tmp, 'country')))
+    df = df.assign(asn=df.probe.apply(pull_from_other_df(tmp, 'asn')))
+    df = df.assign(ip24=df.probe.apply(pull_from_other_df(tmp, 'ip24')))
+    df = df.assign(prefix=df.probe.apply(pull_from_other_df(tmp, 'prefix')))
+    print(df.iloc[0])
+    df.to_pickle('probe_pings.pkl')
+
+    print('grouping by country')
+    tmp = df.groupby(['country'], as_index=False).agg({'results': merge_pings})
+    tmp.to_pickle('country_pings.pkl')
+    print('grouping by asn')
+    tmp = df.loc[df.asn.apply(lambda z: z is not None and len(z) == 1)]
+    tmp.asn = tmp.asn.apply(lambda z: z.pop())
+    tmp = tmp.groupby(['asn'], as_index=False).agg({'results': merge_pings})
+    tmp.to_pickle('asn_pings.pkl')
+    print('grouping by prefix')
+    tmp = df.loc[df.prefix.apply(lambda z: z is not None and len(z) == 1)]
+    tmp.prefix = tmp.prefix.apply(lambda z: z.pop())
+    tmp = tmp.groupby(['prefix'], as_index=False).agg({'results': merge_pings})
+    tmp.to_pickle('prefix_pings.pkl')
+    print('grouping by ip24')
+    tmp = df.loc[df.ip24.apply(lambda z: z is not None and len(z) == 1)]
+    tmp.ip24 = tmp.ip24.apply(lambda z: z.pop())
+    tmp = tmp.groupby(['ip24'], as_index=False).agg({'results': merge_pings})
+    tmp.to_pickle('ip24_pings.pkl')
+
+
+
 def get_per_client():
     print(inspect.stack()[0][3])
     mclient = MongoClient()
@@ -354,6 +420,8 @@ def get_clients(data=None, fname0='get_per_client.pkl', fname='get_clients.pkl')
     tmp.entry_id = tmp.entry_id.apply(lambda z: [str(i) for i in z])
     tmp = tmp.assign(prefix=tmp.pinfo.apply(lambda z: get_prefix(*z)))
     print('got prefixes')
+    tmp = tmp.assign(coords=tmp.pinfo.apply(lambda z: get_coords(z[1])))
+    print('got coordinates')
     tmp = tmp.assign(country=tmp.pinfo.apply(lambda z: get_country(z[1])))
     print('got countries')
     tmp = tmp.assign(asn=tmp.pinfo.apply(lambda z: get_asn(*z)))
@@ -428,9 +496,10 @@ def get_client_probe_groups(data=None, fname='mapped_probes.pkl', fname0='mapped
     data = data.groupby('probe', as_index=False).agg({'results': merge_dicts2,
                                                     'src_addr': lambda z: set(z),
                                                     'ip24': lambda z: set(z),
-                                                    'country': lambda z: set(z),
+                                                    'country': lambda z: list(z)[0],
                                                     'asn': lambda z: set(z),
-                                                    'prefix': lambda z: set(z)})
+                                                    'prefix': lambda z: set(z),
+                                                    'coords': lambda z: list(z)[0]})
     data.to_pickle(fname)
     return data
 
@@ -546,6 +615,7 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302,
                     'asns': [list(atmp.asn), list(btmp.asn)],
                     'prefixes': [list(atmp.prefix), list(btmp.prefix)],
                     'ip24s': [list(atmp.ip24), list(btmp.ip24)],
+                    'coords': [list(atmp.coords), list(btmp.coords)],
                     'dist': c,
                     'ndoms': d}
             with open(fname, 'a+') as f:
@@ -559,6 +629,99 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302,
         coll.insert_many(recents)
 
 
+def get_group_dists():
+    print(inspect.stack()[0][3])
+    mclient = MongoClient()
+    db = mclient.skyline
+    print('loading collections')
+    countries = db.country_dists
+    ip24s = db.ip24_dists
+    prefixes = db.prefix_dists
+    asns = db.asn_dists
+    nearness = db.nearness
+    data = db.distances
+
+    print('opening mapping files')
+    with open('cip24_mapping.json', 'r+') as f:
+        ip242i = json.load(f)['ip242i']
+    with open('cprefix_mapping.json', 'r+') as f:
+        prefix2i = json.load(f)['prefix2i']
+    count = 0
+    pushers = list()
+    for entry in data.find():
+        # handle countries
+        if None not in entry['countries']:
+            label = '_'.join(sorted(entry['countries']))
+            if count % 1000 == 0:
+                print(label, end=', ')
+            d, n = entry['dist'], entry['ndoms']
+            tmp = countries.find_one({'label': label})
+            if tmp is None:
+                countries.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
+            else:
+                countries.update_one({'label': label},
+                        {'$push': {'near': d}, '$push': {'ndoms': n}})
+        # handle asns
+        a, b = entry['asns']
+        if len(a) == 1 and len(b) == 1:
+            label = sortnjoin(a[0], b[0])
+            if count % 1000 == 0:
+                print(label, end=', ')
+            d, n = entry['dist'], entry['ndoms']
+            tmp = asns.find_one({'label': label})
+            if tmp is None:
+                asns.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
+            else:
+                asns.update_one({'label': label},
+                        {'$push': {'near': d}, '$push': {'ndoms': n}})
+        # handle ip24s
+        a, b = entry['ip24s']
+        if len(a) == 1 and len(b) == 1:
+            label = sortnjoin(ip242i[a[0]], ip242i[b[0]])
+            if count % 1000 == 0:
+                print(label, end=', ')
+            d, n = entry['dist'], entry['ndoms']
+            tmp = ip24s.find_one({'label': label})
+            if tmp is None:
+                ip24s.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
+            else:
+                ip24s.update_one({'label': label},
+                        {'$push': {'near': d}, '$push': {'ndoms': n}})
+        # handle prefixes
+        a, b = entry['prefixes']
+        if len(a) == 1 and len(b) == 1:
+            label = sortnjoin(prefix2i[a[0]], prefix2i[b[0]])
+            if count % 1000 == 0:
+                print(label, end=', ')
+            d, n = entry['dist'], entry['ndoms']
+            tmp = prefixes.find_one({'label': label})
+            if tmp is None:
+                prefixes.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
+            else:
+                prefixes.update_one({'label': label},
+                        {'$push': {'near': d}, '$push': {'ndoms': n}})
+
+        # handle distance
+        if None not in entry['coords']:
+            geo = geopy.distance.vincenty(*entry['coords']).km
+            if count % 1000 == 0:
+                print(geo, end=', ')
+            entry['geo'] = geo
+            entry.pop('_id')
+            entry['near'] = entry.pop('dist')
+            pushers.append(entry)
+        if count % 1000 == 0:
+            print(entry['probes'])
+            nearness.insert_many(pushers)
+            count = 1
+            pushers = list()
+        else:
+            count += 1
+
+    if len(pushers) > 0:
+        nearness.insert_many(pushers)
+
+    return df
 
 
 def get_raw_distances(data=None, make_maoping=True, procs=4, domtotal=302,
@@ -618,35 +781,12 @@ def get_ipdoms(data=None):
     return tmp
 
 
-def count_24_matches_raw_clients(clients=None, ipdoms=None):
-    if clients is None:
-        clients = get_clients()
-    if ipdoms is None:
-        ipdoms = get_ipdoms()
-    ipdoms = ipdoms.groupby('res_24').agg({'clients': agg_clients_raw})
-    print('iterating through client results')
-    outdir = format_dirpath(mydir()+'matches')
-    for i, client in clients.iterrows():
-        print(client.src_addr)
-        checked = set()
-        matches = list()
-        for res in client.results:
-            if res[1] in checked:
-                continue
-            matches.extend(ipdoms.loc[[res]].clients.iloc[0])
-            checked.add(res[1])
-        matches = Counter(matches).most_common()
-        with open(outdir+client.src_addr+'.json', 'w+') as f:
-            json.dump(matches, f)
-    # if it freaks out again I'm just going to write the file per client
-    with open('raw_clients_24_counts.json', 'w+') as f:
-        json.dump(matches, f)
-
-
 ################### NUMBER IPs PER DOMAIN
 
 
 ################### DOMAIN OVERLAP
 
 if __name__ == "__main__":
-    get_probe_distances()
+    #get_probe_distances()
+    #get_clients_with_pings()
+    get_group_dists()
