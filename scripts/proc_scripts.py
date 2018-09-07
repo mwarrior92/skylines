@@ -707,8 +707,6 @@ def get_group_dists():
             if count % 1000 == 0:
                 print(geo, end=', ')
             entry['geo'] = geo
-            entry.pop('_id')
-            entry['near'] = entry.pop('dist')
             pushers.append(entry)
         if count % 1000 == 0:
             print(entry['probes'])
