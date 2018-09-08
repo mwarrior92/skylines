@@ -1,4 +1,5 @@
 import numpy as np
+from geopy.distance import vincenty
 
 def individuals_closeness(a, b):
         '''
@@ -16,6 +17,13 @@ def individuals_closeness(a, b):
             return (n/d, d)
         else:
             return (-1, 0)
+
+
+def compare_individuals((agroup, bgroup, (i,j))):
+    a, b = agroup.iloc[i], bgroup.iloc[j]
+    closeness, count = individuals_closeness(a.results, b.results)
+    distance = vincenty(a.coords, b.coords).km
+    return closeness, distance, count
 
 
 def get_individual_closeness((a, b, aid, bid, domtotal)):

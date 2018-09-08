@@ -12,9 +12,9 @@ import pandas as pd
 from pymongo import MongoClient
 import inspect
 from datetime import datetime
-import itertools
+from itertools import combinations, product, izip, repeat, combinations_with_replacement
 from multiprocessing import Pool, Manager
-from surveyor import get_individual_closeness
+from surveyor import get_individual_closeness, compare_individuals
 import geopy.distance
 from bson.objectid import ObjectId
 from reformatting import *
@@ -217,6 +217,43 @@ per_ip_per_dom = {
                 }
             }
         }
+
+
+def get_per_ip_per_dom():
+    print(inspect.stack()[0][3])
+    mclient = MongoClient()
+    db = mclient.skyline
+    coll = db.sam
+
+    global per_ip_per_dom
+
+    return pd.DataFrame.from_records(coll.aggregate([per_ip_per_dom], allowDiskUse=True))
+
+
+def get_ipdoms(data=None):
+    print(inspect.stack()[0][3])
+    if data is None:
+        data = get_per_ip_per_dom()
+    tmp = data._id.apply(lambda z: 'dst_addr' in z and is_public(z['dst_addr']))
+    tmp = data.loc[tmp]
+    print('getting labels')
+    tmp = tmp.assign(ip24=tmp._id.apply(lambda z: get_24(z['dst_addr'])))
+    tmp = tmp.assign(domain=tmp._id.apply(lambda z: z['domain']))
+    tmp = tmp.assign(res_24=tmp._id.apply(lambda z: (get_24(z['dst_addr']), z['domain'])))
+    # reduce to domains that actually resolve multiple destinations
+    print('filtering non-multiplexed')
+    multi = tmp.groupby('domain').ip24.nunique()
+    tmp = tmp.loc[tmp.domain.apply(lambda z: multi[z] > 1)]
+    singles = [z for z in list(multi.index) if multi[z] == 1]
+    with open('singles.json', 'w+') as f:
+        json.dump(singles, f)
+    multi = sorted([(z, multi[z]) for z in list(multi.index) if multi[z] > 1], key=lambda z: z[1])
+    with open('multi.json', 'w+') as f:
+        json.dump(multi, f)
+    tmp = tmp.assign(res_prefix=tmp._id.apply(lambda z: (get_prefix(z['dst_addr']), z['domain'])))
+    # tmp = tmp.set_index(['ip24', 'domain']) # .agg({'clients': agg_clients})
+    return tmp
+
 
 
 def probability_curves():
@@ -504,72 +541,12 @@ def get_client_probe_groups(data=None, fname='mapped_probes.pkl', fname0='mapped
     return data
 
 
-def get_client_24_groups(data=None, fname='mapped_24.pkl', fname0='mapped_clients.pkl'):
-    if data is None:
-        try:
-            data = pd.read_pickle(fname0)
-        except Exception as e:
-            print(e)
-            data = make_result_to_num_mapping()
-    data = data.groupby('ip24', as_index=False).agg({'results': merge_dicts,
-                                                    'src_addr': lambda z: list(z),
-                                                    'probe': lambda z: set(z),
-                                                    'country': lambda z: list(z)[0],
-                                                    'asn': lambda z: set(z),
-                                                    'prefix': lambda z: set(z)})
-    # filter for only groups that have more than one client
-    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
-    return data
-
-
-def get_client_asn_groups(data=None, fname='mapped_asns.pkl', fname0='mapped_clients.pkl'):
-    if data is None:
-        try:
-            data = pd.read_pickle(fname0)
-        except Exception as e:
-            print(e)
-            data = make_result_to_num_mapping()
-    data = data.groupby('asn', as_index=False).agg({'results': merge_dicts,
-                                                    'src_addr': lambda z: list(z),
-                                                    'probe': lambda z: set(z)})
-    # filter for only groups that have more than one client
-    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
-    return data
-
-
-def get_client_country_groups(data=None, fname='mapped_country.pkl', fname0='mapped_clients.pkl'):
-    if data is None:
-        try:
-            data = pd.read_pickle(fname0)
-        except Exception as e:
-            print(e)
-            data = make_result_to_num_mapping()
-    data = data.groupby('country', as_index=False).agg({'results': merge_dicts,
-                                                    'src_addr': lambda z: list(z),
-                                                    'probe': lambda z: set(z)})
-    # filter for only groups that have more than one client
-    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
-    data.to_pickle(fname)
-    return data
-
-
-def get_client_prefix_groups(data=None, fname='mapped_prefix.pkl', fname0='mapped_clients.pkl'):
-    if data is None:
-        data = make_result_to_num_mapping()
-    data = data.groupby('prefix', as_index=False).agg({'results': merge_dicts,
-                                                    'src_addr': lambda z: list(z),
-                                                    'probe': lambda z: set(z)})
-    # filter for only groups that have more than one client
-    data = data.loc[data.probe.apply(lambda z: len(z) > 1)]
-    return data
-
-
 class client_grabber(object):
     def __init__(self, data, k, total):
         self.data = data
         self.data.index = data[k]
         self.total = total
-        self.i = itertools.combinations(range(len(data[k])), 2)
+        self.i = combinations(range(len(data[k])), 2)
 
     def __iter__(self):
         return self
@@ -584,199 +561,58 @@ class client_grabber(object):
             raise StopIteration
 
 
-def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302,
-        fname='probe_distances.json', fname0='mapped_probes.pkl'):
+def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fname0='mapped_probes.pkl'):
     print(inspect.stack()[0][3])
+    if isfile(fname0):
+        data = pd.read_pickle(fname0)
+    else:
+        data = make_result_to_num_mapping()
 
-    print(inspect.stack()[0][3])
-    mclient = MongoClient()
-    db = mclient.skyline
-    coll = db.distances
-
-    if data is None or make_mapping:
-        try:
-            data = pd.read_pickle(fname0)
-        except Exception as e:
-            print(e)
-            data = get_client_probe_groups()
-    data.index = data.probe
     pool = Pool(procs)
-    cgrabber = client_grabber(data, 'probe', domtotal)
-    print('iterating for raw distances...')
-    count = 0
-    recents = list()
-    for c, d, a, b in pool.imap_unordered(get_individual_closeness, cgrabber):
-        if c >= 0:
-            count += 1
-            atmp = data.loc[a]
-            btmp = data.loc[b]
-            mdat = {'probes': [atmp.probe, btmp.probe],
-                    'countries': [atmp.country, btmp.country],
-                    'asns': [list(atmp.asn), list(btmp.asn)],
-                    'prefixes': [list(atmp.prefix), list(btmp.prefix)],
-                    'ip24s': [list(atmp.ip24), list(btmp.ip24)],
-                    'coords': [list(atmp.coords), list(btmp.coords)],
-                    'dist': c,
-                    'ndoms': d}
-            with open(fname, 'a+') as f:
-                f.write(json.dumps(mdat)+"\n")
-            recents.append(mdat)
-            if count % 1000 == 0:
-                print([c, d])
-                coll.insert_many(recents)
-                recents = list()
-    if len(recents) > 0:
-        coll.insert_many(recents)
 
+    group_types = ['country', 'asn', 'prefix', 'ip24']
+    for group_type in group_types:
+        pings = pd.read_pickle(group_type+'_pings.pkl')
+        pings.index = pings[group_type]
+        grouped = data.groupby(group_type)
+        for aname, bname in combinations_with_replacement(list(grouped.groups.keys()), 2):
+            agroup = grouped.get_group(aname)
+            bgroup = grouped.get_group(bname)
+            if len(agroup) == 1 or len(bgroup) == 1:
+                continue
+            print(group_type+': '+str(aname)+', '+str(bname))
+            tmplist = list()
+            i = izip(repeat(agroup), repeat(bgroup), product(range(len(agroup)), range(len(bgroup))))
+            for ret in pool.imap_unordered(compare_individuals, i):
+                if ret[0] >= 0:
+                    tmplist.append(ret)
 
-def get_group_dists():
-    print(inspect.stack()[0][3])
-    mclient = MongoClient()
-    db = mclient.skyline
-    print('loading collections')
-    countries = db.country_dists
-    ip24s = db.ip24_dists
-    prefixes = db.prefix_dists
-    asns = db.asn_dists
-    nearness = db.nearness
-    data = db.distances
-
-    print('opening mapping files')
-    with open('cip24_mapping.json', 'r+') as f:
-        ip242i = json.load(f)['ip242i']
-    with open('cprefix_mapping.json', 'r+') as f:
-        prefix2i = json.load(f)['prefix2i']
-    count = 0
-    pushers = list()
-    for entry in data.find():
-        # handle countries
-        if None not in entry['countries']:
-            label = '_'.join(sorted(entry['countries']))
-            if count % 1000 == 0:
-                print(label, end=', ')
-            d, n = entry['dist'], entry['ndoms']
-            tmp = countries.find_one({'label': label})
-            if tmp is None:
-                countries.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
+            apings = np.median([z for y in pings.loc[aname].results.values() for z in y])
+            bpings = np.median([z for y in pings.loc[bname].results.values() for z in y])
+            pingdiff = abs(apings - bpings)
+            pingmax = max([apings, bpings])
+            comps = len(agroup)*len(bgroup)
+            if len(tmplist) == 1:
+                cmean, cmed = repeat(tmplist[0][0], 2)
+                cstd = 0
+                dmean, dmed = repeat(tmplist[0][1], 2)
+                dstd = 0
+                count = tmplist[0][2]
             else:
-                countries.update_one({'label': label},
-                        {'$push': {'near': d}, '$push': {'ndoms': n}})
-        # handle asns
-        a, b = entry['asns']
-        if len(a) == 1 and len(b) == 1:
-            label = sortnjoin(a[0], b[0])
-            if count % 1000 == 0:
-                print(label, end=', ')
-            d, n = entry['dist'], entry['ndoms']
-            tmp = asns.find_one({'label': label})
-            if tmp is None:
-                asns.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
+                closeness, distance, count = zip(*tmplist)
+                cmean, dmean = np.mean(closeness), np.mean(distance)
+                cmed, dmed = np.median(closeness), np.median(distance)
+                cstd, dstd = np.std(closeness), np.std(distance)
+                count = np.mean(count)
+            if aname != bname:
+                with open(group_type+'_comps_diff.json', 'a+') as f:
+                    f.write(json.dumps([aname, bname, cmean, cmed, cstd, dmean, dmed, dstd, pingdiff,
+                        pingmax, count, comps])+'\n')
             else:
-                asns.update_one({'label': label},
-                        {'$push': {'near': d}, '$push': {'ndoms': n}})
-        # handle ip24s
-        a, b = entry['ip24s']
-        if len(a) == 1 and len(b) == 1:
-            label = sortnjoin(ip242i[a[0]], ip242i[b[0]])
-            if count % 1000 == 0:
-                print(label, end=', ')
-            d, n = entry['dist'], entry['ndoms']
-            tmp = ip24s.find_one({'label': label})
-            if tmp is None:
-                ip24s.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
-            else:
-                ip24s.update_one({'label': label},
-                        {'$push': {'near': d}, '$push': {'ndoms': n}})
-        # handle prefixes
-        a, b = entry['prefixes']
-        if len(a) == 1 and len(b) == 1:
-            label = sortnjoin(prefix2i[a[0]], prefix2i[b[0]])
-            if count % 1000 == 0:
-                print(label, end=', ')
-            d, n = entry['dist'], entry['ndoms']
-            tmp = prefixes.find_one({'label': label})
-            if tmp is None:
-                prefixes.insert_one({'label': label, 'near': [d], 'ndoms': [n]})
-            else:
-                prefixes.update_one({'label': label},
-                        {'$push': {'near': d}, '$push': {'ndoms': n}})
+                with open(group_type+'_comps_same.json', 'a+') as f:
+                    f.write(json.dumps([aname, cmean, cmed, cstd, dmean, dmed, dstd, pingdiff,
+                        pingmax, count, comps])+'\n')
 
-        # handle distance
-        if None not in entry['coords']:
-            geo = geopy.distance.vincenty(*entry['coords']).km
-            if count % 1000 == 0:
-                print(geo, end=', ')
-            entry['geo'] = geo
-            pushers.append(entry)
-        if count % 1000 == 0:
-            print(entry['probes'])
-            nearness.insert_many(pushers)
-            count = 1
-            pushers = list()
-        else:
-            count += 1
-
-    if len(pushers) > 0:
-        nearness.insert_many(pushers)
-
-    return df
-
-
-def get_raw_distances(data=None, make_maoping=True, procs=4, domtotal=302,
-        fname='raw_distances.json', fname0='mapped_clients.pkl'):
-    if data is None or make_mapping:
-        try:
-            data = pd.read_pickle(fname0)
-        except Exception as e:
-            print(e)
-            data = make_result_to_num_mapping()
-    pool = Pool(procs)
-    cgrabber = client_grabber(data, 'src_addr', domtotal)
-    print('iterating for raw distances...')
-    count = 0
-    for c, d, a, b in pool.imap_unordered(get_individual_closeness, cgrabber):
-        if c >= 0:
-            count += 1
-            if count % 1000 == 0:
-                print([c, d])
-            with open(fname, 'a+') as f:
-                f.write(json.dumps([c, d, str(a), str(b)])+"\n")
-
-
-def get_per_ip_per_dom():
-    print(inspect.stack()[0][3])
-    mclient = MongoClient()
-    db = mclient.skyline
-    coll = db.sam
-
-    global per_ip_per_dom
-
-    return pd.DataFrame.from_records(coll.aggregate([per_ip_per_dom], allowDiskUse=True))
-
-
-def get_ipdoms(data=None):
-    print(inspect.stack()[0][3])
-    if data is None:
-        data = get_per_ip_per_dom()
-    tmp = data._id.apply(lambda z: 'dst_addr' in z and is_public(z['dst_addr']))
-    tmp = data.loc[tmp]
-    print('getting labels')
-    tmp = tmp.assign(ip24=tmp._id.apply(lambda z: get_24(z['dst_addr'])))
-    tmp = tmp.assign(domain=tmp._id.apply(lambda z: z['domain']))
-    tmp = tmp.assign(res_24=tmp._id.apply(lambda z: (get_24(z['dst_addr']), z['domain'])))
-    # reduce to domains that actually resolve multiple destinations
-    print('filtering non-multiplexed')
-    multi = tmp.groupby('domain').ip24.nunique()
-    tmp = tmp.loc[tmp.domain.apply(lambda z: multi[z] > 1)]
-    singles = [z for z in list(multi.index) if multi[z] == 1]
-    with open('singles.json', 'w+') as f:
-        json.dump(singles, f)
-    multi = sorted([(z, multi[z]) for z in list(multi.index) if multi[z] > 1], key=lambda z: z[1])
-    with open('multi.json', 'w+') as f:
-        json.dump(multi, f)
-    tmp = tmp.assign(res_prefix=tmp._id.apply(lambda z: (get_prefix(z['dst_addr']), z['domain'])))
-    # tmp = tmp.set_index(['ip24', 'domain']) # .agg({'clients': agg_clients})
-    return tmp
 
 
 ################### NUMBER IPs PER DOMAIN
@@ -787,4 +623,5 @@ def get_ipdoms(data=None):
 if __name__ == "__main__":
     #get_probe_distances()
     #get_clients_with_pings()
-    get_group_dists()
+    #get_group_dists()
+    get_probe_distances()
