@@ -571,17 +571,26 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fna
 
     pool = Pool(procs)
 
-    group_types = ['country', 'asn', 'prefix', 'ip24']
+    # commented this out because country is already completed; needed to continue
+    # group_types = ['country', 'asn', 'prefix', 'ip24']
+    group_types = ['asn', 'prefix', 'ip24'] # 'country',
     for group_type in group_types:
+        print(group_type)
         pings = pd.read_pickle(group_type+'_pings.pkl')
         pings.index = pings[group_type]
-        grouped = data.groupby(group_type)
+        # remove probes that moved across group labels
+        if type(data[group_type].tolist()[0]) in [list, set, tuple]:
+            tmp = data[group_type].apply(lambda z: len(z) == 1)
+            tmp = data.loc[tmp]
+            tmp[group_type] = tmp[group_type].apply(lambda z: next(iter(z)))
+            grouped = tmp.groupby(group_type)
+        else:
+            grouped = data.groupby(group_type)
         for aname, bname in combinations_with_replacement(list(grouped.groups.keys()), 2):
             agroup = grouped.get_group(aname)
             bgroup = grouped.get_group(bname)
             if len(agroup) == 1 or len(bgroup) == 1:
                 continue
-            print(group_type+': '+str(aname)+', '+str(bname)+'; '+str(datetime.now()))
             tmplist = list()
             i = izip(repeat(agroup), repeat(bgroup), product(range(len(agroup)), range(len(bgroup))))
             spins = 0
@@ -594,13 +603,16 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fna
                         sys.stdout.flush()
             if spins > 999:
                 print('\n', end='')
+                print(group_type+': '+str(aname)+', '+str(bname)+'; '+str(datetime.now()))
 
             apings = np.median([z for y in pings.loc[aname].results.values() for z in y])
             bpings = np.median([z for y in pings.loc[bname].results.values() for z in y])
             pingdiff = abs(apings - bpings)
             pingmax = max([apings, bpings])
             comps = len(agroup)*len(bgroup)
-            if len(tmplist) == 1:
+            if len(tmplist) == 0:
+                continue
+            elif len(tmplist) == 1:
                 cmean, cmed = repeat(tmplist[0][0], 2)
                 cstd = 0
                 dmean, dmed = repeat(tmplist[0][1], 2)
