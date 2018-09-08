@@ -2,6 +2,7 @@
 imports raw experiment data
 '''
 from __future__ import print_function
+import sys
 from helpers import format_dirpath, mydir, isfile, listfiles
 import json
 from collections import defaultdict, Counter
@@ -580,12 +581,19 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fna
             bgroup = grouped.get_group(bname)
             if len(agroup) == 1 or len(bgroup) == 1:
                 continue
-            print(group_type+': '+str(aname)+', '+str(bname))
+            print(group_type+': '+str(aname)+', '+str(bname)+'; '+str(datetime.now()))
             tmplist = list()
             i = izip(repeat(agroup), repeat(bgroup), product(range(len(agroup)), range(len(bgroup))))
-            for ret in pool.imap_unordered(compare_individuals, i):
+            spins = 0
+            for ret in pool.imap_unordered(compare_individuals, i, chunksize=100):
                 if ret[0] >= 0:
                     tmplist.append(ret)
+                    spins += 1
+                    if spins % 1000 == 0:
+                        print(spins, end=', ')
+                        sys.stdout.flush()
+            if spins > 999:
+                print('\n', end='')
 
             apings = np.median([z for y in pings.loc[aname].results.values() for z in y])
             bpings = np.median([z for y in pings.loc[bname].results.values() for z in y])
