@@ -13,9 +13,9 @@ import pandas as pd
 from pymongo import MongoClient
 import inspect
 from datetime import datetime
-from itertools import combinations, product, izip, repeat, combinations_with_replacement
+from itertools import combinations, product, izip, repeat, combinations_with_replacement, imap
 from multiprocessing import Pool, Manager
-from surveyor import get_individual_closeness, compare_individuals
+from surveyor import get_individual_closeness, compare_individuals, compare_individuals2
 import geopy.distance
 from bson.objectid import ObjectId
 from reformatting import *
@@ -562,7 +562,7 @@ class client_grabber(object):
             raise StopIteration
 
 
-def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fname0='mapped_probes.pkl'):
+def get_group_distances(data=None, procs=4, domtotal=302, fname0='mapped_probes.pkl'):
     print(inspect.stack()[0][3])
     if isfile(fname0):
         data = pd.read_pickle(fname0)
@@ -571,9 +571,8 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fna
 
     pool = Pool(procs)
 
-    # commented this out because country is already completed; needed to continue
-    # group_types = ['country', 'asn', 'prefix', 'ip24']
-    group_types = ['asn', 'prefix', 'ip24'] # 'country',
+    group_types = ['country', 'asn', 'prefix', 'ip24']
+    # group_types = ['asn', 'prefix', 'ip24'] # 'country',
     for group_type in group_types:
         print(group_type)
         pings = pd.read_pickle(group_type+'_pings.pkl')
@@ -607,7 +606,7 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fna
 
             apings = np.median([z for y in pings.loc[aname].results.values() for z in y])
             bpings = np.median([z for y in pings.loc[bname].results.values() for z in y])
-            pingdiff = abs(apings - bpings)
+            pingdiff = abs(apings - pings)
             pingmax = max([apings, bpings])
             comps = len(agroup)*len(bgroup)
             if len(tmplist) == 0:
@@ -634,6 +633,61 @@ def get_probe_distances(data=None, make_maoping=True, procs=4, domtotal=302, fna
                         pingmax, count, comps])+'\n')
 
 
+def sub_group_cdfs(gname):
+    data = list()
+    with open(gname+'_comps_same.json', 'r+') as f:
+        for line in f:
+            data.append(json.loads(line)[2])
+    ecdf = ECDF(data)
+    x, y = list(ecdf.x), list(ecdf.y)
+    with open(gname+'_same_cdf.json', 'w+') as f:
+        json.dump({'closeness': x, 'CDF of probes': y}, f)
+
+    data = list()
+    with open(gname+'_comps_diff.json', 'r+') as f:
+        for line in f:
+            data.append(json.loads(line)[3])
+    ecdf = ECDF(data)
+    x, y = list(ecdf.x), list(ecdf.y)
+    with open(gname+'_diff_cdf.json', 'w+') as f:
+        json.dump({'closeness': x, 'CDF of probes': y}, f)
+
+
+def get_probe_distances(data=None, procs=4, domtotal=302, fname0='mapped_probes.pkl'):
+    print(inspect.stack()[0][3])
+    if isfile(fname0):
+        data = pd.read_pickle(fname0)
+    else:
+        data = make_result_to_num_mapping()
+
+    pings = pd.read_pickle('probe_pings.pkl')
+    pings.results = pings.results.apply(lambda d: np.median([z for y in d.values() for z in y]))
+
+    pool = Pool(procs)
+    data.index = data.probe
+    i = imap(lambda (x, y): (data.iloc[x], data.iloc[y], pings), combinations(range(len(data)), 2))
+    count = 0
+    print('starting to loop'+str(datetime.now()))
+    for ret in pool.imap_unordered(compare_individuals2, i, chunksize=1000):
+        if ret[2] < 0:
+            continue
+        if count % 2000 == 0:
+            count = 1
+            print(str(ret)+'; '+str(datetime.now()))
+        else:
+            count += 1
+        with open('probe_v_probe.json', 'a+') as f:
+            f.write(json.dumps(ret[:-4])+'\n')
+        with open('closeness_'+str(ret[-4])+'.json', 'a+') as f:
+            f.write(json.dumps(ret[:-4])+'\n')
+        with open('count_'+str(ret[-3])+'.json', 'a+') as f:
+            f.write(json.dumps(ret[:-4])+'\n')
+        with open('dist_'+str(ret[-2])+'.json', 'a+') as f:
+            f.write(json.dumps(ret[:-4])+'\n')
+        with open('ping_'+str(ret[-1])+'.json', 'a+') as f:
+            f.write(json.dumps(ret[:-4])+'\n')
+
+
 
 ################### NUMBER IPs PER DOMAIN
 
@@ -644,4 +698,9 @@ if __name__ == "__main__":
     #get_probe_distances()
     #get_clients_with_pings()
     #get_group_dists()
-    get_probe_distances()
+    #get_group_distances()
+    #get_probe_distances()
+    sub_group_cdfs('country')
+    sub_group_cdfs('ip24')
+    sub_group_cdfs('prefix')
+    sub_group_cdfs('asn')

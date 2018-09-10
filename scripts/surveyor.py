@@ -1,5 +1,6 @@
 import numpy as np
 from geopy.distance import vincenty
+from math import floor, log
 
 def individuals_closeness(a, b):
         '''
@@ -24,6 +25,30 @@ def compare_individuals((agroup, bgroup, (i,j))):
     closeness, count = individuals_closeness(a.results, b.results)
     distance = vincenty(a.coords, b.coords).km
     return closeness, distance, count
+
+
+def compare_individuals2((a, b, pings)):
+    closeness, count = individuals_closeness(a.results, b.results)
+    if closeness < 0:
+        return 0, 0, closeness, 0, 0, 0, count, 0, 0, 0, 0
+    distance = vincenty(a.coords, b.coords).km
+    bclose = floor(closeness / 0.05)
+    bcount = floor(log(count, 10))
+    if abs(distance) > 0:
+        bdist = floor(log(abs(distance), 10))
+    else:
+        bdist = 0
+    try:
+        aping = pings.loc[a.probe].results
+        bping = pings.loc[b.probe].results
+        pdiff = abs(aping-bping)
+        pmax = max([aping, bping])
+        bping = floor(pdiff / 20)
+    except KeyError:
+        pdiff = -1
+        pmax = -1
+        bping = -1
+    return a.probe, b.probe, closeness, distance, pdiff, pmax, count, bclose, bcount, bdist, bping
 
 
 def get_individual_closeness((a, b, aid, bid, domtotal)):
