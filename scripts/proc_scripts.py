@@ -19,6 +19,7 @@ from surveyor import get_individual_closeness, compare_individuals, compare_indi
 import geopy.distance
 from bson.objectid import ObjectId
 from reformatting import *
+from math import floor
 
 
 ################### SET UP GLOBALS ######################
@@ -50,7 +51,11 @@ def num_sites_using_each_link_cdf(fname='sites_per_dom.json'):
     with open(fname, 'r+') as f:
         site_sets = json.load(f)
 
+
     data = [len(site_sets[z]) for z in site_sets]
+    with open('num_sites_using_each_link_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
     ecdf = ECDF(data)
     num_sites, cdf = list(ecdf.x), list(ecdf.y)
     with open('num_sites_using_each_link_cdf.json', 'w+') as f:
@@ -70,6 +75,9 @@ def get_doms_per_site():
         dom_sets[site] = set(hardata[site]['gets'])
     for s in dom_sets:
         dom_sets[s] = list(dom_sets[s])
+    with open('doms_per_site_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
     with open('doms_per_site.json', 'w+') as f:
         json.dump(dom_sets, f)
     return dom_sets
@@ -79,7 +87,11 @@ def num_doms_per_site_cdf(fname='doms_per_site.json'):
     print(inspect.stack()[0][3])
     with open(fname, 'r+') as f:
         dom_sets = json.load(f)
-    ecdf = ECDF([len(dom_sets[z]) for z in dom_sets])
+    data = [len(dom_sets[z]) for z in dom_sets]
+    with open('num_doms_per_site_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
+    ecdf = ECDF(data)
     x, y = list(ecdf.x), list(ecdf.y)
     with open('num_doms_per_site_cdf.json', 'w+') as f:
         json.dump({'num_doms': x, 'cdf_of_sites': y}, f)
@@ -97,7 +109,7 @@ def num_sites_covered_by_top_n_doms(fname='sites_per_dom.json'):
     used = set()
     used_vs_covered = list()
     for i, dom in enumerate(ordered_doms):
-        if i > 200:
+        if i > 500:
             break
         covered = covered.union(site_sets[dom])
         used.add(dom)
@@ -106,7 +118,7 @@ def num_sites_covered_by_top_n_doms(fname='sites_per_dom.json'):
             d = float(len(hardata[site]['gets']))
             n = float(len([z for z in hardata[site]['gets'] if z in used]))
             ratios.append(n/d)
-        used_vs_covered.append((len(used), len(covered), (np.median(ratios), iqr(ratios))))
+        used_vs_covered.append((len(used), len(covered), (np.mean(ratios), np.std(ratios))))
 
     with open('num_sites_covered_by_top_n_doms.json', 'w+') as f:
         json.dump(used_vs_covered, f)
@@ -165,6 +177,23 @@ def nums_per_ip(data):
         cipsubs24[ip24].update(clients)
     ips, dcounts, ccounts = zip(*[(p, len(dipsubs[p]), len(cipsubs[p])) for p in dipsubs])
     ips24, dcounts24, ccounts24 = zip(*[(p, len(dipsubs24[p]), len(cipsubs24[p])) for p in dipsubs24])
+    data = dcounts
+    with open('prefix_dom_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
+    data = ccounts
+    with open('prefix_client_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
+    data = dcounts24
+    with open('ip24_dom_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
+    data = ccounts24
+    with open('ip24_client_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
+
     with open('num_per_prefix.json', 'w+') as f:
         json.dump({'prefixes': ips, 'dom_counts': dcounts, 'client_counts': ccounts}, f)
 
@@ -185,6 +214,14 @@ def nums_per_ip_cdf():
     with open('num_per_prefix.json', 'r+') as f:
         data = json.load(f)
     dcounts, ccounts = ECDF(data['dom_counts']), ECDF(data['client_counts'])
+    data = dcounts
+    with open('dom_per_prefix_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
+    data = ccounts
+    with open('client_per_prefix_stats.json') as f:
+        json.dump({'med': np.median(data, '75': np.percentile(data, 75), '95': np.percentile(data,
+            95), '99': np.percentile(data, 99), 'mean': np.mean(data), 'std': np.std(data)}, f)
     dx, dy = list(dcounts.x), list(dcounts.y)
     cx, cy = list(ccounts.x), list(ccounts.y)
     with open('num_per_prefix_cdf.json', 'w+') as f:
@@ -653,6 +690,61 @@ def sub_group_cdfs(gname):
         json.dump({'closeness': x, 'CDF of probes': y}, f)
 
 
+def percentiles_vs_counts(gname):
+    data = defaultdict(list)
+    with open(gname+'_comps_diff.json', 'r+') as f:
+        for line in f:
+            tmp = json.loads(line)
+            skl = tmp[3]
+            count = tmp[-2]
+            k = floor(count / 10)
+            if k > 28:
+                k = 29
+            k = int(k+1)
+            data[k].append(skl)
+    keys = sorted(data.keys())
+    res = list()
+    prev = min(keys)
+    for k in keys:
+        tmp = k - prev
+        '''
+        while tmp > 1:
+            res.append((' ', 0))
+            tmp -= 1
+        '''
+        res.append((k, np.percentile(data[k], 99)))
+        prev = k
+
+    data = defaultdict(list)
+    with open(gname+'_comps_same.json', 'r+') as f:
+        for line in f:
+            tmp = json.loads(line)
+            skl = tmp[2]
+            count = tmp[-2]
+            k = floor(count / 10)
+            if k > 28:
+                k = 29
+            k = int(k+1)
+            data[k].append(skl)
+    keys = sorted(data.keys())
+    ressame = list()
+    prev = min(keys)
+    for k in keys:
+        tmp = k - prev
+        '''
+        while tmp > 1:
+            res.append((' ', 0))
+            tmp -= 1
+        '''
+        ressame.append((k, np.percentile(data[k], 99)))
+        prev = k
+
+    with open(gname+'_percentile_vs_counts.json', 'w+') as f:
+        json.dump({'diff': res, 'same': ressame}, f)
+
+
+
+
 def get_probe_distances(data=None, procs=4, domtotal=302, fname0='mapped_probes.pkl'):
     print(inspect.stack()[0][3])
     if isfile(fname0):
@@ -700,7 +792,11 @@ if __name__ == "__main__":
     #get_group_dists()
     #get_group_distances()
     #get_probe_distances()
-    sub_group_cdfs('country')
-    sub_group_cdfs('ip24')
-    sub_group_cdfs('prefix')
-    sub_group_cdfs('asn')
+    #sub_group_cdfs('country')
+    #sub_group_cdfs('ip24')
+    #sub_group_cdfs('prefix')
+    #sub_group_cdfs('asn')
+    percentiles_vs_counts('country')
+    percentiles_vs_counts('ip24')
+    percentiles_vs_counts('prefix')
+    percentiles_vs_counts('asn')
