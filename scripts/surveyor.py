@@ -64,25 +64,6 @@ def weight_by_doms(domcount, domtotal):
 def weight_by_client_space(clientsused, clientspacesize):
     return float(clientsused) / float(clientspacesize)
 
-'''
-def groups_closeness(a, b, domtotal):
-    # minimize iteration
-    if len(a) < len(b):
-        aips, bips = zip(*[(a[z], b[z]) for z in a.keys()])
-    else:
-        aips, bips = zip(*[(a[z], b[z]) for z in b.keys()])
-
-    alens = list()
-    [alen.append(len(z)) for z in aips]
-    blens = list()
-    [blens.append(len(z)) for z in bips]
-    meanmin = np.mean([min(alens[z], blens[z]) for z in range(len(alens))])
-
-    n = [(float(len(set(aips[z]).intersection(bips[z])))/float(len(set(aips[z]).union(bips[z]))),
-          min(len(aips),len(bips))) for z in range(len(aips))]
-'''
-
-
 def groups_simple_closeness(a, b):
     '''
     :params a and b: (dict(list)) each key is a domain, and each value is a list of dns answers

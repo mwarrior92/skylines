@@ -29,8 +29,6 @@ with open(topdir+'/support_files/top-1m.csv', 'r+') as f:
 size = 10
 loops = len(alldoms) / size
 
-'''
-#################### UNCOMMENT THIS SECTION FOR DEFAULT OPERATION ###################
 # get clients
 locs = list()
 for c in countries:
@@ -74,16 +72,8 @@ for loc in locs:
     cgs.append(tmp_tcg.get_ClientGroup(platform))
 cgs.append(cg)
 cg = cdo.ClientGroup.merge(*cgs)
-'''
-cg = cdo.ClientGroup()  #### COMMENT THIS OUT FOR DEFAULT OPERATION ###########
 for ind in range(loops):
-    if ind < 166:
-        continue
-    elif ind == 166:
-        cg.load_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"clients_"+str(ind))
-    else:
-        ###### COMMENT OUT THE ABOVE TWO CONDITIONS FOR DEFAULT OPERATION #####
-        cg.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"clients_"+str(ind))
+    cg.save_json(file_path=format_dirpath(topdir+"experiment_records/"+label+"/")+"clients_"+str(ind))
 
     print("ind is: " + str(ind) + "****************")
     doms = alldoms[ind*size:(ind+1)*size]
