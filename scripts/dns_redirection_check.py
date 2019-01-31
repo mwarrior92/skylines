@@ -50,20 +50,20 @@ my_mro.set('file_path',
         format_dirpath(topdir+"data/"+label+"/")+"testing_probes.json")
 c = collector.SpinningCollector(my_mro, timeout=60*5, spin_time=120)
 collector.wait_on_collectors([c])
-with open(my_mro.get('file_path'), 'r+') as f:
+with open(my_mro.file_path, 'r+') as f:
     data = json.load(f)
 client_info = dict()
-for client in cg.get('clients'):
-    client_info[client.get('probe_id')] = client.get('country_code')
+for client in cg.clients:
+    client_info[client.probe_id] = client.country_code
 good_probes = set()
 for r in data['results']:
     if 'answers' in r:
         if 'A' in r['answers']:
             good_probes.add(r['prb_id'])
-bad_probes = [z for z in cg.get('clients') if z.get('probe_id') not in good_probes]
-cg.clients = [z for z in cg.get('clients') if z.get('probe_id') in good_probes]
+bad_probes = [z for z in cg.clients if z.probe_id not in good_probes]
+cg.clients = [z for z in cg.clients if z.probe_id in good_probes]
 locs = list()
-for c in [z.get('country_code') for z in bad_probes]:
+for c in [z.country_code for z in bad_probes]:
     locs.append(cdo.TargetLocation())
     locs[-1].set_countries([c])
 cgs = list()
@@ -97,13 +97,13 @@ for ind in range(loops):
         #c.grabber_thread.join()
         collector.wait_on_collectors([c])
 
-        with open(my_mro.get('file_path'), 'r+') as f:
+        with open(my_mro.file_path, 'r+') as f:
             data = json.load(f)
 
         client_info = dict()
         pushed = 0
-        for client in cg.get('clients'):
-            client_info[client.get('probe_id')] = client.get('country_code')
+        for client in cg.clients:
+            client_info[client.probe_id] = client.country_code
         entries = list()
         good_probes = set()
         for r in data['results']:
@@ -122,10 +122,10 @@ for ind in range(loops):
         time.sleep(60)
 
     # refresh client set
-    bad_probes = [z for z in cg.get('clients') if z.get('probe_id') not in good_probes]
-    cg.clients = [z for z in cg.get('clients') if z.get('probe_id') in good_probes]
+    bad_probes = [z for z in cg.clients if z.probe_id not in good_probes]
+    cg.clients = [z for z in cg.clients if z.probe_id in good_probes]
     locs = list()
-    for c in [z.get('country_code') for z in bad_probes]:
+    for c in [z.country_code for z in bad_probes]:
         locs.append(cdo.TargetLocation())
         locs[-1].set_countries([c])
     cgs = list()

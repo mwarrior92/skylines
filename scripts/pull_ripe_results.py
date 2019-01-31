@@ -4,10 +4,11 @@ import helpers
 
 if __name__ == '__main__':
     i = 86400 # -> seconds in a day
-    a = 1530285305
+    a = 1530285305 # timestamp of end of first day
     b = a - i
     c = list()
     l = 0
+    # slide date window forwards until the the last 10 attempted pulls are bad
     while len(c) == 0 or sum(c) > 0:
         print(l)
         results = meas_handler.Results(helpers.datadir+'sam'+str(l)+'.json', description='skyline_all_probes',

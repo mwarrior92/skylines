@@ -30,6 +30,9 @@ hardataf = format_dirpath(topdir+'data/parse_hars/')+'getlists.json'
 ################### DOMAIN DATA COLLECTION ######################
 
 def get_sites_per_dom():
+    '''
+    gets set of sites each domain appeared on
+    '''
     print(inspect.stack()[0][3])
     with open(hardataf, 'r+') as f:
         hardata = json.load(f)
@@ -47,6 +50,9 @@ def get_sites_per_dom():
 
 
 def num_sites_using_each_link_cdf(fname='sites_per_dom.json'):
+    '''
+    plots CDF of # of sites each domain appeared on
+    '''
     print(inspect.stack()[0][3])
     with open(fname, 'r+') as f:
         site_sets = json.load(f)
@@ -64,6 +70,9 @@ def num_sites_using_each_link_cdf(fname='sites_per_dom.json'):
 
 
 def get_doms_per_site():
+    '''
+    gets set of domains that appeared on each site
+    '''
     print(inspect.stack()[0][3])
     global hardataf
     with open(hardataf, 'r+') as f:
@@ -84,6 +93,9 @@ def get_doms_per_site():
 
 
 def num_doms_per_site_cdf(fname='doms_per_site.json'):
+    '''
+    makes CDF of number of domains that appear on each site
+    '''
     print(inspect.stack()[0][3])
     with open(fname, 'r+') as f:
         dom_sets = json.load(f)
@@ -98,6 +110,10 @@ def num_doms_per_site_cdf(fname='doms_per_site.json'):
 
 
 def num_sites_covered_by_top_n_doms(fname='sites_per_dom.json'):
+    '''
+    gets how the number of sites covered increased with each additional domain
+    considered
+    '''
     print(inspect.stack()[0][3])
     with open(hardataf, 'r+') as f:
         hardata = json.load(f)
@@ -124,6 +140,11 @@ def num_sites_covered_by_top_n_doms(fname='sites_per_dom.json'):
         json.dump(used_vs_covered, f)
 
 ################### DOMAIN DATA ANALYSIS ######################
+
+'''
+groups results by destination IP
+- clients and domains are lumped into respective sets for each IP
+'''
 
 per_ip = {
         '$group': {
@@ -155,6 +176,9 @@ def get_per_ip():
 
 
 def nums_per_ip(data):
+    '''
+    gets number of domains associated with and number of clients directed to each IP
+    '''
     print(inspect.stack()[0][3])
     tmp = data._id.apply(lambda z: is_public(z))
     tmp = data.loc[tmp]
@@ -202,6 +226,10 @@ def nums_per_ip(data):
 
 
 def nums_per_ip_cdf():
+    '''
+    plot CDF of number of domains associated with each IP and number of
+    clientes directed to each IP
+    '''
     print(inspect.stack()[0][3])
     with open('num_per_ip.json', 'r+') as f:
         data = json.load(f)
@@ -236,7 +264,9 @@ def nums_per_ip_cdf():
         json.dump({'doms_per_ip': dx, 'CDF_of_ips_for_doms': dy, 'clients_per_ip': cx,
             'CDF_of_ips_for_clients': cy}, f)
 
-
+'''
+group clients by destination IP and domain
+'''
 
 per_ip_per_dom = {
         '$group': {
@@ -258,6 +288,9 @@ per_ip_per_dom = {
 
 
 def get_per_ip_per_dom():
+    '''
+    get
+    '''
     print(inspect.stack()[0][3])
     mclient = MongoClient()
     db = mclient.skyline
