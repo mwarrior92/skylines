@@ -45,7 +45,7 @@ class ExperimentData(object):
     def supportdir(self, val):
         self._supportdir = val
 
-    def convert_path(self, path):
+    def fmt_path(self, path):
         '''
         converts path from simplified name to full path
         example: "datadir/foo.json" -> "/home/user/research/data/foo.json"
@@ -72,7 +72,7 @@ class ExperimentData(object):
         '''
         loads and returns json from file; path is automatically formatted
         '''
-        path = self.convert_path(path)
+        path = self.fmt_path(path)
         with open(path, 'r') as f:
             data = json.load(f)
         return data
@@ -81,7 +81,7 @@ class ExperimentData(object):
         '''
         saves json to path all at once
         '''
-        path = self.convert_path(path)
+        path = self.fmt_path(path)
         with open(path, 'w') as f:
             json.dump(data, f)
 
@@ -89,7 +89,7 @@ class ExperimentData(object):
         '''
         saves line to file with list of json entries
         '''
-        path = self.convert_path(path)
+        path = self.fmt_path(path)
         with open(path, 'a') as f:
             f.write(json.dumps(line)+'\n')
 
@@ -98,7 +98,7 @@ class ExperimentData(object):
         iterator for fragmented json file; goes one line at a time; path is
         automatically formatted
         '''
-        path = self.convert_path(path)
+        path = self.fmt_path(path)
         if path in self.open_files:
             f = self.open_files[path]
         else:
@@ -113,16 +113,17 @@ class ExperimentData(object):
             yield json.loads(line)
 
     def load_pkl_df(self, path):
-        path = self.convert_path(path)
+        path = self.fmt_path(path)
         return pandas.read_pickle(path)
 
     def __del__(self):
         # close any open files so nothing is left hanging
-        paths = list(self.open_files.keys())
-        for path in paths:
-            try:
-                self.open_files[path].close()
-            except (OSError, IOError):
-                pass
-            del self.open_files[path]
+        if hasattr(self, 'open_files'):
+            paths = list(self.open_files.keys())
+            for path in paths:
+                try:
+                    self.open_files[path].close()
+                except (OSError, IOError):
+                    pass
+                del self.open_files[path]
 

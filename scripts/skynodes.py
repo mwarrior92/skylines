@@ -1,23 +1,56 @@
 import pandas
-from pymongo import MongoClient
 from experimentdata import ExperimentData
 
 pandas.options.mode.chained_assignment = None
 
-
-class NodeFormatter(ExperimentData):
-    def __init__(self, raw_mode=False, **kwargs):
+class Nodes(ExperimentData):
+    def __init__(self, raw_mode=False, limit=None, min_tests=None, **kwargs):
         '''
         class to simplify accessing node data
         '''
-        mclient = MongoClient()
-        db = mclient.skyline
-        self.coll = db.sam
+
         # when False, maps domains/answers to int values; this saves time on
         # comparisons (which happen a lot for closeness calculation)
         self.raw_mode = raw_mode
         for k in kwargs:
-            setattr(self, k, kwargs)
+            setattr(self, k, kwargs[k])
+
+    @property
+    def limit(self, limit):
+        return len(self.probes_df)
+
+    @limit.setter
+    def limit(self, limit):
+        if limit is None:
+            pass
+        elif type(limit) is int:
+            if not self.min_tests:
+                self.probes_df = self.probes_df.iloc[:limit]
+            else:
+                keeps = list()
+                for i, n in enumerate(self.probes_df):
+                    if len(n.results) >= self.min_tests:
+                        keeps.append(i)
+                    if len(keeps) >= limit:
+                        break
+                self.probes_df = self.probes_df.iloc[keeps]
+        else:
+            raise ValueError('expected tpye None or int for attribute "limit"')
+
+    @property
+    def min_tests(self):
+        if hasattr(self, '_min_tests'):
+            return self._min_tests
+        return 0
+
+    @min_tests.setter
+    def min_tests(self, minTests):
+        if minTests is None:
+            pass
+        elif type(minTests) is int:
+            self._min_tests = minTests
+        else:
+            raise ValueError('expected type int for min_tests')
 
     def load_mappings(self):
         self._domi = self.load_json('datadir/mappings/dom_mapping.json')
