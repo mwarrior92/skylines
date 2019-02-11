@@ -2,6 +2,7 @@ from geopy.distance import vincenty
 from collections import defaultdict
 import cPickle as pkl
 from experimentdata import ExperimentData
+from skynodes import CollapsedNode
 
 def count_answers_across_nodes(nodes):
     count = defaultdict(lambda: 0.0)
@@ -15,8 +16,8 @@ def count_answers_across_nodes(nodes):
 
 class NodeComparison(ExperimentData):
     def __init__(self, akey, bkey, nodes, counts=None, weight_by_rarity=False, **kwargs):
-        self.a = nodes[akey]
-        self.b = nodes[bkey]
+        self.a = CollapsedNode(nodes[akey])
+        self.b = CollapsedNode(nodes[bkey])
         self.akey = akey
         self.bkey = bkey
         self.counts = counts
@@ -44,6 +45,7 @@ class NodeComparison(ExperimentData):
 
     @property
     def closeness(self):
+        # TODO: fix this method
         '''
         calculate and return closeness between a and b
         '''
@@ -53,10 +55,11 @@ class NodeComparison(ExperimentData):
         for dom in self.shared_domains:
             aRes = self.a.results[dom]
             bRes = self.b.results[dom]
-            if aRes == bRes:
+            shared_ans = aRes.intersection(bRes)
+            if len(shared_ans):
                 if self.weight_by_rarity:
                     # to how many probes did dom give same ans
-                    ansCount = self.count[(dom, aRes)]
+                    ansCount = sum([self.count[(dom, z) for z in shared_ans])
                     # how many probes tested dom
                     testCount = self.count[dom]
                     # we want rare things to weigh more
