@@ -2,6 +2,7 @@ import pandas
 from experimentdata import ExperimentData
 from collections import defaultdict
 from scipy.stats import mode
+from random import sample
 
 pandas.options.mode.chained_assignment = None
 
@@ -71,19 +72,24 @@ class Nodes(ExperimentData):
         print('applying rules')
         self.rules_applied = True
         getattr(self, 'group_by_'+self.group_mode)()
+        if not self.min_tests:
+            self._probes_df = self._probes_df.iloc[:self.limit]
+            keeps = range(len(self._probes_df))
+        else:
+            keeps = list()
+            for i, n in self._probes_df.iterrows():
+                # make sure we're dealing with 1D data
+                n = CollapsedNode(n)
+                if len(n.results) >= self.min_tests:
+                    keeps.append(i)
+        self._probes_df = self._probes_df.iloc[keeps]
         if self.limit:
-            if not self.min_tests:
-                self.probes_df = self.probes_df.iloc[:self.limit]
+            keeps = range(len(self._probes_df))
+            if self._sample == 'random':
+                keeps = sample(keeps, self.limit)
             else:
-                keeps = list()
-                for i, n in self.probes_df.iterrows():
-                    # make sure we're dealing with 1D data
-                    n = CollapsedNode(n)
-                    if len(n.results) >= self.min_tests:
-                        keeps.append(i)
-                    if len(keeps) >= self.limit:
-                        break
-                self.probes_df = self.probes_df.iloc[keeps]
+                keeps = keeps[:self.limit]
+            self._probes_df = self._probes_df.iloc[keeps]
 
     def group_by_probe(self):
         print('grouping by probe')
@@ -114,6 +120,8 @@ class Nodes(ExperimentData):
     def limit(self):
         if not hasattr(self, '_limit'):
             self._limit = None
+        if not hasattr(self, '_sample'):
+            self._sample = 'random'
         return self._limit
 
     @limit.setter

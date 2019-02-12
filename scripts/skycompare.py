@@ -11,7 +11,7 @@ def count_answers_across_nodes(nodes):
             count[key] += 1.0
             count[key[0]] += 1.0
     with open(nodes.fmt_path('datadir/pkls/answer_counts.pkl'), 'w') as f:
-        pkl.dump(count, f)
+        pkl.dump(dict(count), f)
     return count
 
 class NodeComparison(ExperimentData):
@@ -45,31 +45,24 @@ class NodeComparison(ExperimentData):
 
     @property
     def closeness(self):
-        # TODO: fix this method
         '''
         calculate and return closeness between a and b
         '''
         if hasattr(self, '_closeness'):
             return self._closeness
-        n = list()
+        n = 0
+        d = 0
         for dom in self.shared_domains:
             aRes = self.a.results[dom]
             bRes = self.b.results[dom]
+            all_ans = list(aRes) + list(bRes)
             shared_ans = aRes.intersection(bRes)
-            if len(shared_ans):
-                if self.weight_by_rarity:
-                    # to how many probes did dom give same ans
-                    ansCount = sum([self.count[(dom, z) for z in shared_ans])
-                    # how many probes tested dom
-                    testCount = self.count[dom]
-                    # we want rare things to weigh more
-                    n.append(testCount/ansCount)
-                else:
-                    n.append(1.0)
-        if len(self.shared_domains) == 0:
-            self._closeness = -1
-        else:
-            self._closeness = sum(n)/float(len(self.shared_domains))
+            ans_weight = float(sum([self.counts[(dom, z)] for z in all_ans]))
+            # this will be zero if nothing matches
+            matches = float(len(shared_ans)) / float(len(set(all_ans)))
+            n += matches*ans_weight
+            d += ans_weight
+        self._closeness = n/d
         return self._closeness
 
     @closeness.setter

@@ -60,7 +60,7 @@ class ExperimentData(object):
                 except AttributeError:
                     break
         path = '/'.join(chunks)
-        if path.endswith('/'):
+        if not path.endswith('/'):
             dirs = '/'.join(chunks[:-1])
         else:
             dirs = path
