@@ -16,7 +16,7 @@ def count_answers_across_nodes(nodes):
     return count
 
 class NodeComparison(ExperimentData):
-    def __init__(self, a, b, counts=None, weight_by_rarity=False, **kwargs):
+    def __init__(self, a, b, counts={}, weight_by_rarity=False, **kwargs):
         self.a = a
         self.b = b
         self.counts = counts
@@ -26,7 +26,7 @@ class NodeComparison(ExperimentData):
 
     @property
     def counts(self):
-        if not hasattr(self, '_counts') or self._counts is None:
+        if not hasattr(self, '_counts') or self._counts == {}:
             path = self.fmt_path('datadir/pkls/answer_counts.pkl')
             with open(path, 'r') as f:
                 self._counts = pkl.load(f)

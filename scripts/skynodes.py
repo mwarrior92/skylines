@@ -25,7 +25,8 @@ def CollapsedNode(node):
     return node
 
 class Nodes(ExperimentData):
-    def __init__(self, group_mode='probe', raw_mode=False, limit=None, min_tests=None, **kwargs):
+    def __init__(self, group_mode='probe', raw_mode=False, limit=0,
+            min_tests=0, **kwargs):
         '''
         class to simplify accessing node data
         '''
@@ -34,9 +35,10 @@ class Nodes(ExperimentData):
         self.min_tests = min_tests
         self.limit = limit
         self.group_mode = group_mode
-        self.apply_rules()
         for k in kwargs:
             setattr(self, k, kwargs[k])
+        if 'rules_applied' not in kwargs or not kwargs['rules_applied']:
+            self.apply_rules()
 
     def __getattr__(self, k):
         if hasattr(self, '_probes_df') and hasattr(self._probes_df, k):
@@ -48,29 +50,31 @@ class Nodes(ExperimentData):
         print('applying rules')
         self.rules_applied = True
         getattr(self, 'group_by_'+self.group_mode)()
-        if not self.min_tests:
-            self._probes_df = self._probes_df.iloc[:self.limit]
-            keeps = range(len(self._probes_df))
-        else:
+        if self.min_tests:
+            print('filtering for min tests')
             keeps = list()
             for i, n in self._probes_df.iterrows():
                 # make sure we're dealing with 1D data
-                n = CollapsedNode(n)
+                if self.group_mode == 'probe':
+                    n = CollapsedNode(n)
                 if len(n.results) >= self.min_tests:
                     keeps.append(i)
         self._probes_df = self._probes_df.iloc[keeps]
         if self.limit:
+            print('filtering for limit')
             keeps = range(len(self._probes_df))
             if self._sample == 'random':
                 keeps = sample(keeps, self.limit)
             else:
                 keeps = keeps[:self.limit]
             self._probes_df = self._probes_df.iloc[keeps]
+        print('done applying rules')
 
     def group_by_probe(self):
-        print('grouping by probe')
         self.load_probes_df()
+        print('grouping by probe')
         groups = self.probes_df.groupby('probe', as_index=False)
+        print('aggregating probes')
         self.probes_df = groups.aggregate(lambda z: list(z))
 
     def group_by_src_addr(self):
@@ -79,7 +83,7 @@ class Nodes(ExperimentData):
     @property
     def group_mode(self):
         if not hasattr(self, '_group_mode'):
-            self._group_mode = None
+            self._group_mode = 'probe'
         return self._group_mode
 
     @group_mode.setter
@@ -95,7 +99,7 @@ class Nodes(ExperimentData):
     @property
     def limit(self):
         if not hasattr(self, '_limit'):
-            self._limit = None
+            self._limit = 0
         if not hasattr(self, '_sample'):
             self._sample = 'random'
         return self._limit
@@ -103,7 +107,7 @@ class Nodes(ExperimentData):
     @limit.setter
     def limit(self, limit):
         if not limit:
-            self._limit = None
+            self._limit = 0
         elif type(limit) is int:
             self._limit = limit
         else:

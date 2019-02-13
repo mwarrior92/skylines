@@ -3,6 +3,7 @@ import inspect
 import json
 import pandas
 from time import localtime, strftime
+import cPickle as pickle
 
 class ExperimentData(object):
     def __init__(self, **kwargs):
@@ -15,6 +16,12 @@ class ExperimentData(object):
         return strftime('%Y%H%M', localtime())
 
     @property
+    def timeid(self):
+        if not hasattr(self, '_timeid'):
+            self._timeid = self.timestr
+        return self._timeid
+
+    @property
     def basedir(self):
         if not hasattr(self, '_basedir'):
             self_file = os.path.abspath(inspect.stack()[0][1]) # source [1]
@@ -25,6 +32,18 @@ class ExperimentData(object):
     @basedir.setter
     def basedir(self, val):
         self._basedir = val
+
+    @property
+    def objectdir(self):
+        if not hasattr(self, '_objectdir'):
+            self._objectdir = self.basedir + 'objects/'
+        if not os.path.exists(self._objectdir):
+            os.makedirs(self._objectdir)
+        return self._objectdir
+
+    @objectdir.setter
+    def objectdir(self, val):
+        self._objectdir = val
 
     @property
     def datadir(self):
@@ -131,6 +150,13 @@ class ExperimentData(object):
     def load_pkl_df(self, path):
         path = self.fmt_path(path)
         return pandas.read_pickle(path)
+
+    def save_self(self, fname=None):
+        if fname is None:
+            fname = self.fmt_path('objectdir/'+self.__class__.__name__+ \
+                    '/'+self.timeid+'.pkl')
+        with open(fname, 'w') as f:
+            pickle.dump(self.__dict__, f)
 
     def __del__(self):
         # close any open files so nothing is left hanging

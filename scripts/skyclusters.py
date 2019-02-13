@@ -3,24 +3,23 @@ from skynodes import Nodes, CollapsedNode
 from experimentdata import ExperimentData
 from multiprocessing import Pool
 import itertools
-from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.cluster.hierarchy import dendrogram, linkage, cophenet
 from matplotlib import pyplot as plt
 
 def get_closeness((a, b, kwargs)):
     nc = NodeComparison(a, b, **kwargs)
     nc.get_closeness()
-    print(nc.closeness)
     return nc.closeness
 
 class SkyClusterBuilder(ExperimentData):
-    def __init__(self, workers=None, limit=None, min_tests=160, **kwargs):
-        self.nodes = Nodes(limit=limit, min_tests=min_tests)
+    def __init__(self, limit=0, min_tests=160, **kwargs):
         self.threads = list()
         self.matrix = list()
-        self.pool = Pool(processes=workers)
         self.kwargs = kwargs
         for k in kwargs:
             setattr(self, k, kwargs[k])
+        if not hasattr(self, 'nodes'):
+            self.nodes = Nodes(limit=limit, min_tests=min_tests)
 
     @property
     def chunksize(self):
@@ -34,7 +33,7 @@ class SkyClusterBuilder(ExperimentData):
     def chunksize(self, val):
         self._chunksize = val
 
-    def make_closeness_matrix(self):
+    def make_closeness_matrix(self, workers=None):
         print('calculating closeness matrix')
 
         itr = itertools.combinations(range(len(self.nodes)), 2)
@@ -42,30 +41,43 @@ class SkyClusterBuilder(ExperimentData):
             CollapsedNode(self.nodes[z[1]]),
             self.kwargs), itr)
 
-        for c in self.pool.imap(get_closeness, itr, self.chunksize):
-                self.matrix.append(c)
+        pool = Pool(processes=workers)
+        count = 0
+        for c in pool.imap(get_closeness, itr, self.chunksize):
+            self.matrix.append(c)
+            count += 1
+            if not count % 1000:
+                print(self.matrix[-1])
         print('done calculating matrix')
+        self.save_self()
 
     @property
     def dendrogram_fname(self):
-        path = self.fmt_path('plotsdir/dendrogram/'+self.timestr+'.png')
-        return path
+        if not hasattr(self, '_dendrogram_fname'):
+            self._dendrogram_fname = self.fmt_path('plotsdir/dendrogram/'+self.timeid+'.png')
+        return self._dendrogram_fname
+
+    @dendrogram_fname.setter
+    def dendrogram_fname(self, val):
+        self._dendrogram_fname = val
 
     def make_dendrogram(self, fname=None, **kwargs):
         if len(self.matrix) == 0:
             self.make_closeness_matrix()
         print('making dendrogram')
-        L = linkage(self.matrix, method='complete')
+        self.linkage = linkage(self.matrix, method='complete')
+        self.cophenet = cophenet(self.linkage, self.matrix)
         fig, (ax) = plt.subplots(1,1, figsize=(6, 3.5))
-        self.dendrogram = dendrogram(L, ax=ax,
+        self.dendrogram = dendrogram(self.linkage, ax=ax,
                 labels=[CollapsedNode(self.nodes[i]).country for i in range(len(self.nodes))],
                 **kwargs)
-        if fname is None:
-            fname = self.dendrogram_fname
-        fig.savefig(fname)
+        if fname is not None:
+            self.dendrogram_fname = fname
+        fig.savefig(self.dendrogram_fname)
         plt.close(fig)
-        return fname
+        self.save_self()
+        return self.dendrogram_fname
 
 if __name__ == "__main__":
-    b = SkyClusterBuilder(limit=30)
-    print(b.make_dendrogram())
+    b = SkyClusterBuilder(limit=40)
+    print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50))
