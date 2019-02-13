@@ -52,21 +52,20 @@ class Nodes(ExperimentData):
         '''
         class to simplify accessing node data
         '''
-
         self.rules_applied = False
-        for k in kwargs:
-            setattr(self, k, kwargs[k])
         self.raw_mode = raw_mode
         self.min_tests = min_tests
         self.limit = limit
         self.group_mode = group_mode
         self.apply_rules()
+        for k in kwargs:
+            setattr(self, k, kwargs[k])
 
     def __getattr__(self, k):
         if hasattr(self, '_probes_df') and hasattr(self._probes_df, k):
             return getattr(self.probes_df, k)
         else:
-            raise AttributeError('! no member '+k)
+            raise AttributeError(str(type(self))+', '+k)
 
     def apply_rules(self):
         print('applying rules')

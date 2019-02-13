@@ -10,6 +10,7 @@ def count_answers_across_nodes(nodes):
         for key in nodes[i].results.iteritems():
             count[key] += 1.0
             count[key[0]] += 1.0
+    print('getting count answers')
     with open(nodes.fmt_path('datadir/pkls/answer_counts.pkl'), 'w') as f:
         pkl.dump(dict(count), f)
     return count
@@ -62,7 +63,7 @@ class NodeComparison(ExperimentData):
             matches = float(len(shared_ans)) / float(len(set(all_ans)))
             n += matches*ans_weight
             d += ans_weight
-        self._closeness = n/d
+        self._closeness = 1.0 - (n/d)
         return self._closeness
 
     @closeness.setter
@@ -93,7 +94,7 @@ class NodeComparison(ExperimentData):
 
 if __name__ == '__main__':
     from skynodes import Nodes
-    m_nodes = Nodes(limit=100)
+    m_nodes = Nodes(limit=20, min_tests=160)
     m_nc = NodeComparison(50,51, m_nodes)
     print(m_nc.__dict__)
     m_c = m_nc.get_closeness()

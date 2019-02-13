@@ -2,12 +2,17 @@ import os
 import inspect
 import json
 import pandas
+from time import localtime, strftime
 
 class ExperimentData(object):
     def __init__(self, **kwargs):
         self.open_files = dict()
         for k in kwargs:
             setattr(self, k, kwargs[k])
+
+    @property
+    def timestr(self):
+        return strftime('%Y%H%M', localtime())
 
     @property
     def basedir(self):
@@ -45,6 +50,18 @@ class ExperimentData(object):
     def supportdir(self, val):
         self._supportdir = val
 
+    @property
+    def plotsdir(self):
+        if not hasattr(self, '_plotsdir'):
+            self._plotsdir = self.basedir + 'plots/'
+        if not os.path.exists(self._plotsdir):
+            os.makedirs(self._plotsdir)
+        return self._plotsdir
+
+    @plotsdir.setter
+    def plotsdir(self, val):
+        self._plotsdir = val
+
     def fmt_path(self, path):
         '''
         converts path from simplified name to full path
@@ -52,18 +69,17 @@ class ExperimentData(object):
         '''
         chunks = path.split('/')
         for i in range(len(chunks)):
-            if chunks[i]:
+            if chunks[i] and chunks[i].endswith('dir'):
                 try:
                     chunks[i] = getattr(self, chunks[i])
                     if chunks[i].endswith('/'): # we add / later
                         chunks[i] = chunks[i][:-1]
                 except AttributeError:
                     break
+            else:
+                break
         path = '/'.join(chunks)
-        if not path.endswith('/'):
-            dirs = '/'.join(chunks[:-1])
-        else:
-            dirs = path
+        dirs = os.path.dirname(path)
         if not os.path.exists(dirs):
             os.makedirs(dirs)
         return path
