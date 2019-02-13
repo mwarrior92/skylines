@@ -6,11 +6,10 @@ import itertools
 from scipy.cluster.hierarchy import dendrogram, linkage
 from matplotlib import pyplot as plt
 
-def get_closeness((pos, nodes, kwargs)):
-    i, j = pos
-    nc = NodeComparison(i, j, nodes, **kwargs)
+def get_closeness((a, b, kwargs)):
+    nc = NodeComparison(a, b, **kwargs)
     nc.get_closeness()
-    print(str(pos)+': '+str(nc.closeness))
+    print(nc.closeness)
     return nc.closeness
 
 class SkyClusterBuilder(ExperimentData):
@@ -39,8 +38,9 @@ class SkyClusterBuilder(ExperimentData):
         print('calculating closeness matrix')
 
         itr = itertools.combinations(range(len(self.nodes)), 2)
-        itr = itertools.izip(itr, itertools.repeat(self.nodes),
-                itertools.repeat(self.kwargs))
+        itr = itertools.imap(lambda z: (CollapsedNode(self.nodes[z[0]]),
+            CollapsedNode(self.nodes[z[1]]),
+            self.kwargs), itr)
 
         for c in self.pool.imap(get_closeness, itr, self.chunksize):
                 self.matrix.append(c)

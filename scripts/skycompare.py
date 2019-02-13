@@ -16,11 +16,9 @@ def count_answers_across_nodes(nodes):
     return count
 
 class NodeComparison(ExperimentData):
-    def __init__(self, akey, bkey, nodes, counts=None, weight_by_rarity=False, **kwargs):
-        self.a = CollapsedNode(nodes[akey])
-        self.b = CollapsedNode(nodes[bkey])
-        self.akey = akey
-        self.bkey = bkey
+    def __init__(self, a, b, counts=None, weight_by_rarity=False, **kwargs):
+        self.a = a
+        self.b = b
         self.counts = counts
         self.weight_by_rarity = weight_by_rarity
         for k in kwargs:

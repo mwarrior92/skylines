@@ -6,46 +6,23 @@ from random import sample
 
 pandas.options.mode.chained_assignment = None
 
-class CollapsedNode(ExperimentData):
+def CollapsedNode(node):
     '''
-    class to avoid running into over-complicated iteration issues when grouped
+    func to avoid running into over-complicated iteration issues when grouped
     by probe (because each column entry becomes a list)
     '''
-    def __init__(self, node, **kwargs):
-        # make sure we're not being redundant
-        if type(node) is CollapsedNode:
-            return node
-        elif type(node) is not pandas.core.series.Series:
-            raise ValueError('! node must be of type pandas Series')
-        self.node = node
-        for k in kwargs:
-            setattr(self, k, kwargs[k])
-
-    def __getattr__(self, k):
-        if k in self.node and k not in {'local', 'coords',
-                'rcvd', 'entry_id'} and type(getattr(self.node, k)) is list:
+    results = defaultdict(set)
+    for res in node.results:
+        for k, v in res.iteritems():
+            results[k].add(v)
+    node['results'] = dict(results)
+    for k in node.index:
+        if k not in {'local', 'coords', 'rcvd',
+                'entry_id'} and type(node[k]) is list:
             # if it's a column, just return most common value
-            m, c = mode(self.node[k])
-            setattr(self, k, m[0])
-            return m[0]
-        elif hasattr(self.node, k):
-            return getattr(self.node, k)
-        else:
-            raise AttributeError('! no attribute '+k)
-
-    @property
-    def results(self):
-        if hasattr(self, '_results'):
-            pass
-        elif type(self.node.results) is list:
-            self._results = defaultdict(set)
-            for res in self.node.results:
-                for k, v in res.iteritems():
-                    self._results[k].add(v)
-        else:
-            return self.node.results
-        return self._results
-
+            m, c = mode(node[k])
+            node[k] = m[0]
+    return node
 
 class Nodes(ExperimentData):
     def __init__(self, group_mode='probe', raw_mode=False, limit=None, min_tests=None, **kwargs):
