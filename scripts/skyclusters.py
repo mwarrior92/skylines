@@ -49,6 +49,8 @@ class SkyClusterBuilder(ExperimentData):
             if not count % 1000:
                 print(self.matrix[-1])
         print('done calculating matrix')
+        self.linkage = linkage(self.matrix, method='complete')
+        self.cophenet = cophenet(self.linkage, self.matrix)
         self.save_self()
 
     @property
@@ -62,11 +64,9 @@ class SkyClusterBuilder(ExperimentData):
         self._dendrogram_fname = val
 
     def make_dendrogram(self, fname=None, **kwargs):
-        if len(self.matrix) == 0:
+        if not hasattr(self, 'linkage'):
             self.make_closeness_matrix()
         print('making dendrogram')
-        self.linkage = linkage(self.matrix, method='complete')
-        self.cophenet = cophenet(self.linkage, self.matrix)
         fig, (ax) = plt.subplots(1,1, figsize=(6, 3.5))
         self.dendrogram = dendrogram(self.linkage, ax=ax,
                 labels=[CollapsedNode(self.nodes[i]).country for i in range(len(self.nodes))],
@@ -80,4 +80,5 @@ class SkyClusterBuilder(ExperimentData):
 
 if __name__ == "__main__":
     b = SkyClusterBuilder(limit=40)
-    print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50))
+    #print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50))
+    b.make_closeness_matrix()
