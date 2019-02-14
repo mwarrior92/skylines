@@ -16,13 +16,26 @@ def count_answers_across_nodes(nodes):
     return count
 
 class NodeComparison(ExperimentData):
-    def __init__(self, a, b, counts={}, weight_by_rarity=False, **kwargs):
+    def __init__(self, a, b, counts={}, **kwargs):
         self.a = a
         self.b = b
         self.counts = counts
-        self.weight_by_rarity = weight_by_rarity
         for k in kwargs:
             setattr(self, k, kwargs[k])
+        if 'from_file' in kwargs and kwargs['from_file']:
+            apath = self.fmt_path('objectdir/nodecomp/'+self.timeid+'_a.json')
+            bpath = self.fmt_path('objectdir/nodecomp/'+self.timeid+'_b.json')
+            self.a.read_json(apath)
+            self.b.read_json(bpath)
+
+    def save_self(self, timeid=None):
+        if timeid is None:
+            timeid = self.timeid
+        apath = self.fmt_path('objectdir/nodecomp/'+timeid+'_a.json')
+        bpath = self.fmt_path('objectdir/nodecomp/'+timeid+'_b.json')
+        self.a.to_json(apath)
+        self.b.to_json(bpath)
+        super(type(self),self).save_self(timeid)
 
     @property
     def counts(self):

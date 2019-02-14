@@ -5,6 +5,8 @@ from multiprocessing import Pool
 import itertools
 from scipy.cluster.hierarchy import dendrogram, linkage, cophenet
 from matplotlib import pyplot as plt
+from numpy import array
+import json
 
 def get_closeness((a, b, kwargs)):
     nc = NodeComparison(a, b, **kwargs)
@@ -13,13 +15,33 @@ def get_closeness((a, b, kwargs)):
 
 class SkyClusterBuilder(ExperimentData):
     def __init__(self, limit=0, min_tests=160, **kwargs):
-        self.threads = list()
         self.matrix = list()
         self.kwargs = kwargs
         for k in kwargs:
             setattr(self, k, kwargs[k])
+        if 'from_file' in kwargs and kwargs['from_file']:
+            path = self.fmt_path('objectdir/nodes/'+self.timeid+'.json')
+            with open(path, 'r') as f:
+                p = json.load(f)
+            self.nodes = Nodes(**p)
+            try:
+                path = self.fmt_path('objectdir/linkage/'+timeid+'.json')
+                with open(path, 'r') as f:
+                    self.linkage = array(json.load(f))
+            except:
+                pass
         if not hasattr(self, 'nodes'):
             self.nodes = Nodes(limit=limit, min_tests=min_tests)
+
+    def save_self(self, timeid=None):
+        if timeid is None:
+            timeid = self.timeid
+        if hasattr(self, 'linkage'):
+            path = self.fmt_path('objectdir/linkage/'+timeid+'.json')
+            linkage = self.linkage.tolist()
+            with open(path, 'w') as f:
+                json.dump(linkage, f)
+        super(type(self),self).save_self(timeid)
 
     @property
     def chunksize(self):
@@ -50,8 +72,12 @@ class SkyClusterBuilder(ExperimentData):
                 print(self.matrix[-1])
         print('done calculating matrix')
         self.linkage = linkage(self.matrix, method='complete')
-        self.cophenet = cophenet(self.linkage, self.matrix)
+        self.cophenet = cophenet(self.linkage, self.matrix)[0]
         self.save_self()
+        path = self.fmt_path('objectdir/linkage_and_matrix/'+self.timeid+'.json')
+        with open(path, 'w') as f:
+            json.dump({'matrix': self.matrix, 'linkage': self.linkage.tolist(),
+                'cophenet': self.cophenet}, f)
 
     @property
     def dendrogram_fname(self):
@@ -76,9 +102,8 @@ class SkyClusterBuilder(ExperimentData):
         fig.savefig(self.dendrogram_fname)
         plt.close(fig)
         self.save_self()
-        return self.dendrogram_fname
+        return self.dendrogram_fname, self.dendrogram
 
 if __name__ == "__main__":
     b = SkyClusterBuilder(limit=40)
-    #print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50))
-    b.make_closeness_matrix()
+    print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50)[0])

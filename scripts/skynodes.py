@@ -24,6 +24,7 @@ def CollapsedNode(node):
             node[k] = m[0]
     return node
 
+
 class Nodes(ExperimentData):
     def __init__(self, group_mode='probe', raw_mode=False, limit=0,
             min_tests=0, **kwargs):
@@ -37,6 +38,9 @@ class Nodes(ExperimentData):
         self.group_mode = group_mode
         for k in kwargs:
             setattr(self, k, kwargs[k])
+        if 'from_file' in kwargs and kwargs['from_file']:
+            path = self.fmt_path('objectdir/probes_df/'+self.timeid+'.json')
+            self._probes_df = pandas.read_json(path)
         if 'rules_applied' not in kwargs or not kwargs['rules_applied']:
             self.apply_rules()
 
@@ -45,6 +49,14 @@ class Nodes(ExperimentData):
             return getattr(self.probes_df, k)
         else:
             raise AttributeError(str(type(self))+', '+k)
+
+    def save_self(self, timeid=None):
+        if timeid is None:
+            timeid = self.timeid
+        if hasattr(self, '_probes_df') and len(self._probes_df) > 0:
+            path = self.fmt_path('objectdir/probes_df/'+timeid+'.json')
+            self._probes_df.to_json(path)
+        super(type(self),self).save_self(timeid)
 
     def apply_rules(self):
         print('applying rules')

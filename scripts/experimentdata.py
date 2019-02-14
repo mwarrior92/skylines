@@ -13,7 +13,7 @@ class ExperimentData(object):
 
     @property
     def timestr(self):
-        return strftime('%Y%H%M', localtime())
+        return strftime('%Y%d%H%M', localtime())
 
     @property
     def timeid(self):
@@ -151,12 +151,22 @@ class ExperimentData(object):
         path = self.fmt_path(path)
         return pandas.read_pickle(path)
 
-    def save_self(self, fname=None):
-        if fname is None:
-            fname = self.fmt_path('objectdir/'+self.__class__.__name__+ \
-                    '/'+self.timeid+'.pkl')
+    def save_self(self, timeid=None):
+        if timeid is None:
+            timeid = self.timeid
+        fname = self.fmt_path('objectdir/'+self.__class__.__name__+ \
+                '/'+self.timeid+'.json')
+        data = dict()
+        for k in self.__dict__:
+            try:
+                json.dumps(getattr(self, k))
+                data[k] = getattr(self, k)
+            except:
+                if hasattr(getattr(self, k), 'save_self'):
+                    getattr(getattr(self, k), 'save_self')(timeid)
+        data['from_file'] = True
         with open(fname, 'w') as f:
-            pickle.dump(self.__dict__, f)
+            json.dump(data, f)
 
     def __del__(self):
         # close any open files so nothing is left hanging
