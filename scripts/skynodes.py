@@ -67,8 +67,6 @@ class Nodes(ExperimentData):
             keeps = list()
             for i, n in self._probes_df.iterrows():
                 # make sure we're dealing with 1D data
-                if self.group_mode == 'probe':
-                    n = CollapsedNode(n)
                 if len(n.results) >= self.min_tests:
                     keeps.append(i)
         self._probes_df = self._probes_df.iloc[keeps]
@@ -88,6 +86,7 @@ class Nodes(ExperimentData):
         groups = self.probes_df.groupby('probe', as_index=False)
         print('aggregating probes')
         self.probes_df = groups.aggregate(lambda z: list(z))
+        self.probes_df = self.probes_df.apply(CollapsedNode, axis=1)
 
     def group_by_src_addr(self):
         self.load_probes_df()
@@ -197,19 +196,13 @@ class Nodes(ExperimentData):
     def get_node(self, index):
         return self.probes_df.iloc[index]
 
-    def get_mapped_node(self, index):
-        node = CollapsedNode(self.get_node(index))
+    def get_mapped_node(self, node):
         node.results = {self.domi['i2dom'][k]: self.ipi['i2ip'][v] for (k, v) \
                 in node.results.iteritems()}
         return node
 
     def __getitem__(self, index):
-        if self.raw_mode:
-            # NOTE: this is a CollapsedNode
-            return self.get_mapped_node(index)
-        else:
-            # NOTE: this is a Series
-            return self.get_node(index)
+        return self._probes_df.iloc[index]
 
     def __len__(self):
         return len(self.probes_df)

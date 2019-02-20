@@ -2,7 +2,6 @@ from geopy.distance import vincenty
 from collections import defaultdict
 import cPickle as pkl
 from experimentdata import ExperimentData
-from skynodes import CollapsedNode
 
 def count_answers_across_nodes(nodes):
     count = defaultdict(lambda: 0.0)
@@ -22,11 +21,12 @@ class NodeComparison(ExperimentData):
         self.counts = counts
         for k in kwargs:
             setattr(self, k, kwargs[k])
-        if 'from_file' in kwargs and kwargs['from_file']:
-            apath = self.fmt_path('objectdir/nodecomp/'+self.timeid+'_a.json')
-            bpath = self.fmt_path('objectdir/nodecomp/'+self.timeid+'_b.json')
-            self.a.read_json(apath)
-            self.b.read_json(bpath)
+
+    def load_from_file(self):
+        apath = self.fmt_path('objectdir/nodecomp/'+self.timeid+'_a.json')
+        bpath = self.fmt_path('objectdir/nodecomp/'+self.timeid+'_b.json')
+        self.a.read_json(apath)
+        self.b.read_json(bpath)
 
     def save_self(self, timeid=None):
         if timeid is None:
