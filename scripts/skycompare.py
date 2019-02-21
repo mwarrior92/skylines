@@ -67,11 +67,11 @@ class NodeComparison(ExperimentData):
         for dom in self.shared_domains:
             aRes = self.a.results[dom]
             bRes = self.b.results[dom]
-            all_ans = list(aRes) + list(bRes)
-            shared_ans = aRes.intersection(bRes)
-            ans_weight = float(sum([self.counts[(dom, z)] for z in all_ans]))
+            # all_ans = list(aRes) + list(bRes)
+            # shared_ans = aRes.intersection(bRes)
+            ans_weight = float(sum([self.counts[(dom, z)] for xRes in [aRes, bRes] for z in xRes]))
             # this will be zero if nothing matches
-            matches = float(len(shared_ans)) / float(len(set(all_ans)))
+            matches = float(len(aRes.intersection(bRes))) / float(len(aRes.union(bRes)))
             n += matches*ans_weight
             d += ans_weight
         self._closeness = 1.0 - (n/d)
