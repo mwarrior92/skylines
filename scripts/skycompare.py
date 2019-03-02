@@ -64,6 +64,7 @@ class NodeComparison(ExperimentData):
             return self._closeness
         n = 0
         d = 0
+        domd = dict()
         for dom in self.shared_domains:
             aRes = self.a.results[dom]
             bRes = self.b.results[dom]

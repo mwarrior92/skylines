@@ -1,5 +1,5 @@
 import pandas
-from experimentdata import ExperimentData
+from experimentdata import ExperimentData, DataGetter
 from collections import defaultdict
 from scipy.stats import mode
 from random import sample
@@ -22,6 +22,16 @@ def CollapsedNode(node):
             # if it's a column, just return most common value
             m, c = mode(node[k])
             node[k] = m[0]
+    return node
+
+def ChangePrefix(node, newp, oldp=24):
+    results = defaultdict(set)
+    d = DataGetter()
+    for k, v in node.results.iteritems():
+        v = d.int2ip(v, oldp)
+        v = d.ip2int(v, newp)
+        results[k] = v
+    node['results'] = dict(results)
     return node
 
 
@@ -78,7 +88,21 @@ class Nodes(ExperimentData):
             else:
                 keeps = keeps[:self.limit]
             self._probes_df = self._probes_df.iloc[keeps]
+        if self.prefix != 24:
+            self.probes_df = self.probes_df.apply(lambda z: ChangePrefix(z, self.prefix), axis=1)
+
         print('done applying rules')
+
+    @property
+    def prefix(self):
+        if not hasattr(self, '_prefix'):
+            self._prefix = 24 # defaults to /24 answers
+        return self._prefix
+
+    @prefix.setter
+    def prefix(self, val):
+        self._prefix = int(val)
+        self.rules_applied = False
 
     def group_by_probe(self):
         self.load_probes_df()
@@ -200,6 +224,9 @@ class Nodes(ExperimentData):
         node.results = {self.domi['i2dom'][k]: self.ipi['i2ip'][v] for (k, v) \
                 in node.results.iteritems()}
         return node
+
+    def get_raw_domain(self, key):
+        return self.domi['i2dom'][key]
 
     def __getitem__(self, index):
         return self._probes_df.iloc[index]
