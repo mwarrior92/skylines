@@ -206,8 +206,10 @@ class SkyClusterBuilder(ExperimentData):
 
 if __name__ == "__main__":
 
-    b = SkyClusterBuilder(limit=40)
+    b = SkyClusterBuilder()
     with open(b.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
         b.kwargs['counts'] = pkl.load(f)
     #print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50)[0])
+    with open(b.fmt_path('datadir/matrix/matrix.json'), 'r') as f:
+        b.matrix = json.load(f)
     b.closeness_vs_domain()
