@@ -122,7 +122,7 @@ class SkyClusterBuilder(ExperimentData):
                     dom = D.int2dom(d)
                     pos = dompos[d]
                     print(domd[dom][pos])
-                    domd[dom].put(pos, c - float(len(a[d].intersection(b[d])))/len(a[d].union(b[d])))
+                    domd[dom].put(pos, (1-c) - float(len(a[d].intersection(b[d])))/len(a[d].union(b[d])))
                     print(dom)
                     print(pos)
                     print(domd[dom][pos])
@@ -177,6 +177,7 @@ class SkyClusterBuilder(ExperimentData):
         fig.savefig(self.fmt_path('plotsdir/closeness_vs_dom/'+self.timeid+'.png'))
         plt.close(fig)
         self.save_self()
+        print(self.fmt_path('plotsdir/closeness_vs_dom/'+self.timeid+'.png'))
         return stats
 
     @property
