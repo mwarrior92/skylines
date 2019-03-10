@@ -6,6 +6,7 @@ import itertools
 from scipy.cluster.hierarchy import dendrogram, linkage, cophenet
 from matplotlib import pyplot as plt
 from numpy import array, mean, percentile, std, zeros, full
+from math import ceil
 import json
 import cPickle as pkl
 import time
@@ -204,6 +205,32 @@ class SkyClusterBuilder(ExperimentData):
         plt.close(fig)
         self.save_self()
         return self.dendrogram_fname, self.dendrogram
+
+    def get_pair_indices(self, k):
+        '''
+        k -> position in condensed distance matrix
+        https://stackoverflow.com/a/36867493/4335446
+        '''
+        n = len(self.nodes)
+        i = int(ceil((1/2.) * (- (-8*k + 4 *n**2 -4*n - 7)**0.5 + 2*n -1) - 1))
+        I = i+1
+        tmp = I * (n - 1 - I) + (I*(I + 1))/2
+        j = int(n - tmp + k)
+        return (i, j)
+
+    def get_matrix_index(self, i, j):
+        '''
+        i and j -> indices in nodes
+        '''
+        n = len(self.nodes)
+        return  d*(d-1)/2 - (d-i)*(d-i-1)/2 + j - i - 1
+
+    def get_pair_closeness(self, i, j):
+        return self.matrix[self.get_matrix_index(i, j)]
+
+    def crne(self, i, j):
+        return self.matrix[self.get_matrix_index(i, j)]
+
 
 if __name__ == "__main__":
 

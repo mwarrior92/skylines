@@ -3,6 +3,7 @@ from experimentdata import ExperimentData, DataGetter
 from collections import defaultdict
 from scipy.stats import mode
 from random import sample
+from numpy import array, ndarray, zeros
 
 pandas.options.mode.chained_assignment = None
 
@@ -57,6 +58,8 @@ class Nodes(ExperimentData):
     def __getattr__(self, k):
         if hasattr(self, '_probes_df') and hasattr(self._probes_df, k):
             return getattr(self.probes_df, k)
+        elif k.startswith('to_'):
+            return self.to_(k.split('to_')[1])
         else:
             raise AttributeError(str(type(self))+', '+k)
 
@@ -79,7 +82,7 @@ class Nodes(ExperimentData):
                 # make sure we're dealing with 1D data
                 if len(n.results) >= self.min_tests:
                     keeps.append(i)
-        self._probes_df = self._probes_df.iloc[keeps]
+            self._probes_df = self._probes_df.iloc[keeps]
         if self.limit:
             print('filtering for limit')
             keeps = range(len(self._probes_df))
@@ -88,6 +91,7 @@ class Nodes(ExperimentData):
             else:
                 keeps = keeps[:self.limit]
             self._probes_df = self._probes_df.iloc[keeps]
+        self._probes_df['idx'] =  pandas.Series(range(len(self._probes_df)), index=self._probes_df.index)
         if self.prefix != 24:
             self.probes_df = self.probes_df.apply(lambda z: ChangePrefix(z, self.prefix), axis=1)
 
@@ -234,3 +238,13 @@ class Nodes(ExperimentData):
     def __len__(self):
         return len(self.probes_df)
 
+    def to_(self, key):
+        def func(item):
+            if type(item) in [list, ndarray, set]:
+                out = zeros(len(item), dtype=object)
+                for i, node in enumerate(item):
+                    out[i] = func(node)
+            else:
+                out = self._probes_df.iloc[item][key]
+            return out
+        return func
