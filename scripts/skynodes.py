@@ -83,6 +83,7 @@ class Nodes(ExperimentData):
                 if len(n.results) >= self.min_tests:
                     keeps.append(i)
             self._probes_df = self._probes_df.iloc[keeps]
+        self.posmap = {z: z for z in range(len(self._probes_df))}
         if self.limit:
             print('filtering for limit')
             keeps = range(len(self._probes_df))
@@ -91,6 +92,8 @@ class Nodes(ExperimentData):
             else:
                 keeps = keeps[:self.limit]
             self._probes_df = self._probes_df.iloc[keeps]
+            self.posmap = {z: keeps[z] for z in range(len(keeps))}
+        self.mappos = {v: k for (k,v) in self.posmap.items()}
         self._probes_df['idx'] =  pandas.Series(range(len(self._probes_df)), index=self._probes_df.index)
         if self.prefix != 24:
             self.probes_df = self.probes_df.apply(lambda z: ChangePrefix(z, self.prefix), axis=1)
@@ -233,6 +236,11 @@ class Nodes(ExperimentData):
         return self.domi['i2dom'][key]
 
     def __getitem__(self, index):
+        if type(index) is tuple:
+            if index[1] == 1:
+                return self._probes_df.iloc[self.mappos[index[0]]]
+            else:
+                return self._probes_df.iloc[self.posmap[index[0]]]
         return self._probes_df.iloc[index]
 
     def __len__(self):

@@ -13,12 +13,31 @@ import time
 from collections import defaultdict
 from statsmodels.distributions.empirical_distribution import ECDF
 
+class vs_dom_itr:
+    def __init__(self, obj, itr, domid):
+        self.obj = obj
+        self.itr = itr
+        self.domid = domid
+    def __iter__(self):
+        return self
+
+    def next(self):
+        a, b = next(self.itr)
+        print((a, b))
+        return (self.obj.nodes[a].results,
+        self.obj.nodes[b].results,
+        self.obj.matrix[self.obj.get_matrix_index(self.obj.nodes.posmap[a], self.obj.nodes.posmap[b])], self.domid)
+
 def get_closeness((a, b, kwargs)):
     nc = NodeComparison(a, b, **kwargs)
     return nc.closeness
 
-def get_vs_domain((a, b, closeness, kwargs)):
-    return nc.closeness_vs_domain
+def get_vs_domain((a, b, distance, dom)):
+    time.sleep(120)
+    if dom in a and dom in b:
+        match = float(len(a[dom].intersection(b[dom])))/float(len(a[dom].union(b[dom])))
+        return True, dom, (1.0-distance) - match
+    return (False, None, None)
 
 class SkyClusterBuilder(ExperimentData):
     def __init__(self, limit=0, min_tests=160, **kwargs):
@@ -65,7 +84,7 @@ class SkyClusterBuilder(ExperimentData):
     @property
     def chunksize(self):
         if not hasattr(self, '_chunksize'):
-            self._chunksize = 50
+            self._chunksize = 1
         return self._chunksize
 
     @chunksize.setter
@@ -100,40 +119,57 @@ class SkyClusterBuilder(ExperimentData):
         with open(path, 'w') as f:
             json.dump(self.matrix, f)
 
-    def closeness_vs_domain(self, workers=None):
+    def closeness_vs_domain(self, domid, workers=None):
         if not hasattr(self, '_closeness_vs_domain_stats'):
             if len(self.matrix) == 0:
                 self.make_closeness_matrix(workers)
-            t = time.time()
             print('comparing closeness to each domain')
-            itr = itertools.izip(itertools.combinations(range(len(self.nodes)), 2),
-                    xrange(len(self.matrix)))
-            itr = itertools.imap(lambda (z, x): (self.nodes[z[0]].results, self.nodes[z[1]].results, self.matrix[x]), itr)
+            combos = itertools.combinations(range(len(self.nodes)), 2)
+            itr = vs_dom_itr(self, combos, domid)
             D = DataGetter(prefix=self.prefix)
             domd = dict()
-            for dom in D.test_counts:
-                if not self.nodes.limit:
-                    domd[D.int2dom(dom)] = full(int(D.test_counts[dom])**2, -3.0, float)
-                else:
-                    domd[D.int2dom(dom)] = full(self.nodes.limit**2, -3.0, float)
+            if not self.nodes.limit:
+                domd[D.int2dom(domid)] = full(len(self.matrix), -3.0, float)
+            else:
+                domd[D.int2dom(domid)] = full(1+((self.nodes.limit**2)/2), -3.0, float)
             dompos = defaultdict(int)
             count = 0
-            for a, b, c in itr:
-                for d  in set(a.keys()).intersection(b.keys()):
-                    dom = D.int2dom(d)
-                    pos = dompos[d]
-                    print(domd[dom][pos])
-                    domd[dom].put(pos, (1-c) - float(len(a[d].intersection(b[d])))/len(a[d].union(b[d])))
-                    print(dom)
-                    print(pos)
-                    print(domd[dom][pos])
-                    dompos[d] += 1
+            pool = Pool(processes=workers)
+            count = 0
+            t = time.time()
+            results = list()
+            while True:
+                while len(results) < pool._processes:
+                    try:
+                        results.append(pool.apply_async(get_vs_domain, next(itr)))
+                    except StopIteration:
+                        break
+                current = list()
+                for worker in results:
+                    try:
+                        res = worker.get(timeout=0.01)
+                        if res[0]:
+                            domd[D.int2dom(res[1])].put(dompos[res[1]], res[2])
+                            dompos[res[1]] += 1
+                        if count % 10000 == 0:
+                            print(str(count)+' --- '+str(time.time()-t))
+                        count += 1
+                    except:
+                        current.append(worker)
+                results = current
+
+            '''
+            for res in pool.imap_unordered(get_vs_domain, itr, self.chunksize):
+                if res[0]:
+                    domd[D.int2dom(res[1])].put(dompos[res[1]], res[2])
+                    dompos[res[1]] += 1
                 if count % 10000 == 0:
-                    print(time.time())
+                    print(str(count)+' --- '+str(time.time()-t))
                 count += 1
+            '''
             for dom in domd:
                 domd[dom] = [z for z in domd[dom] if z > -3]
-            with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/raw.json'), 'w') as f:
+            with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/'+str(domid)+'.json'), 'w') as f:
                 json.dump(domd, f)
             outd = dict()
             maxstd = 0
@@ -148,20 +184,24 @@ class SkyClusterBuilder(ExperimentData):
                         }
                 if outd[d]['std'] > maxstd:
                     maxstd = outd[d]['std']
-            with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/stats.json'), 'w') as f:
+            with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/'+str(domid)+'.json'), 'w') as f:
                 json.dump(outd, f)
 
             self._closeness_vs_domain_stats = outd
             self._closeness_vs_domain_raw = dict(domd)
             print(time.time() - t)
-        stats = self._closeness_vs_domain_stats
-        d = DataGetter(prefix=self.prefix)
+
+    def plot_closeness_vs_domain(self, *allstats):
+        stats = dict()
+        for dom in allstats:
+            stats.update(dom)
+        D = DataGetter(prefix=self.prefix)
         mean_errs = list()
         answers = list()
         stds = list()
         tups = list()
         for dom in stats:
-            answers.append(d.diversity(dom))
+            answers.append(D.diversity(dom))
             mean_errs.append(stats[dom]['mean'])
             stds.append(stats[dom]['std'])
             tups.append((mean_errs[-1], stds[-1], answers[-1]))
@@ -177,8 +217,9 @@ class SkyClusterBuilder(ExperimentData):
         ax.set_ylabel('# distinct answers')
         fig.savefig(self.fmt_path('plotsdir/closeness_vs_dom/'+self.timeid+'.png'))
         plt.close(fig)
-        self.save_self()
         print(self.fmt_path('plotsdir/closeness_vs_dom/'+self.timeid+'.png'))
+        print('backing up objects...')
+        self.save_self()
         return stats
 
     @property
@@ -213,8 +254,7 @@ class SkyClusterBuilder(ExperimentData):
         '''
         n = len(self.nodes)
         i = int(ceil((1/2.) * (- (-8*k + 4 *n**2 -4*n - 7)**0.5 + 2*n -1) - 1))
-        I = i+1
-        tmp = I * (n - 1 - I) + (I*(I + 1))/2
+        tmp = i * (n - 1 - i) + (i*(i + 1))/2
         j = int(n - tmp + k)
         return (i, j)
 
@@ -222,8 +262,11 @@ class SkyClusterBuilder(ExperimentData):
         '''
         i and j -> indices in nodes
         '''
+        assert i != j, "no diagonal elements in condensed matrix"
+        if i < j:
+            i, j = j, i
         n = len(self.nodes)
-        return  d*(d-1)/2 - (d-i)*(d-i-1)/2 + j - i - 1
+        return n*j - j*(j+1)/2 + i - 1 - j
 
     def get_pair_closeness(self, i, j):
         return self.matrix[self.get_matrix_index(i, j)]
@@ -234,10 +277,10 @@ class SkyClusterBuilder(ExperimentData):
 
 if __name__ == "__main__":
 
-    b = SkyClusterBuilder()
+    b = SkyClusterBuilder(limit=500)
     with open(b.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
         b.kwargs['counts'] = pkl.load(f)
     #print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50)[0])
     with open(b.fmt_path('datadir/matrix/matrix.json'), 'r') as f:
         b.matrix = json.load(f)
-    b.closeness_vs_domain()
+    b.closeness_vs_domain(5, workers=2)
