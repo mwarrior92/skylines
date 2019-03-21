@@ -23,7 +23,6 @@ class vs_dom_itr:
 
     def next(self):
         a, b = next(self.itr)
-        print((a, b))
         return (self.obj.nodes[a].results,
         self.obj.nodes[b].results,
         self.obj.matrix[self.obj.get_matrix_index(self.obj.nodes.posmap[a], self.obj.nodes.posmap[b])], self.domid)
@@ -33,7 +32,6 @@ def get_closeness((a, b, kwargs)):
     return nc.closeness
 
 def get_vs_domain((a, b, distance, dom)):
-    time.sleep(120)
     if dom in a and dom in b:
         match = float(len(a[dom].intersection(b[dom])))/float(len(a[dom].union(b[dom])))
         return True, dom, (1.0-distance) - match
@@ -84,7 +82,7 @@ class SkyClusterBuilder(ExperimentData):
     @property
     def chunksize(self):
         if not hasattr(self, '_chunksize'):
-            self._chunksize = 1
+            self._chunksize = 20000
         return self._chunksize
 
     @chunksize.setter
@@ -138,26 +136,9 @@ class SkyClusterBuilder(ExperimentData):
             count = 0
             t = time.time()
             results = list()
-            while True:
-                while len(results) < pool._processes:
-                    try:
-                        results.append(pool.apply_async(get_vs_domain, next(itr)))
-                    except StopIteration:
-                        break
-                current = list()
-                for worker in results:
-                    try:
-                        res = worker.get(timeout=0.01)
-                        if res[0]:
-                            domd[D.int2dom(res[1])].put(dompos[res[1]], res[2])
-                            dompos[res[1]] += 1
-                        if count % 10000 == 0:
-                            print(str(count)+' --- '+str(time.time()-t))
-                        count += 1
-                    except:
-                        current.append(worker)
-                results = current
-
+            '''
+            for item in itr:
+                res = get_vs_domain(item)
             '''
             for res in pool.imap_unordered(get_vs_domain, itr, self.chunksize):
                 if res[0]:
@@ -166,7 +147,6 @@ class SkyClusterBuilder(ExperimentData):
                 if count % 10000 == 0:
                     print(str(count)+' --- '+str(time.time()-t))
                 count += 1
-            '''
             for dom in domd:
                 domd[dom] = [z for z in domd[dom] if z > -3]
             with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/'+str(domid)+'.json'), 'w') as f:
@@ -283,4 +263,4 @@ if __name__ == "__main__":
     #print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50)[0])
     with open(b.fmt_path('datadir/matrix/matrix.json'), 'r') as f:
         b.matrix = json.load(f)
-    b.closeness_vs_domain(5, workers=2)
+    b.closeness_vs_domain(5)
