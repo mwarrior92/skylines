@@ -1,41 +1,91 @@
 from skycompare import NodeComparison, count_answers_across_nodes
 from skynodes import Nodes
 from experimentdata import ExperimentData, DataGetter
-from multiprocessing import Pool
+from multiprocessing import Pool, Process, Queue, Condition
+from multiprocessing.sharedctypes import RawArray
 import itertools
 from scipy.cluster.hierarchy import dendrogram, linkage, cophenet
 from matplotlib import pyplot as plt
-from numpy import array, mean, percentile, std, zeros, full
+import numpy as np
 from math import ceil
 import json
 import cPickle as pkl
 import time
 from collections import defaultdict
 from statsmodels.distributions.empirical_distribution import ECDF
+from ctypes import c_double
+import os.path
+import gc
 
-class vs_dom_itr:
-    def __init__(self, obj, itr, domid):
+
+def cycle_worker(q):
+    while True:
+        job, arg = q.get()
+        if type(job) is str and job == 'exit':
+            return True
+        job(arg)
+        del arg
+
+def dump_domain_error(data):
+    out = defaultdict(list)
+    for dom, val in data:
+        out[dom].append(val)
+    D = DataGetter()
+    if not os.path.exists(D.datadir+'domain_error/'):
+        os.makedirs(D.datadir+'domain_error/')
+
+    for dom in out:
+        with open(D.datadir+'domain_error/'+str(dom)+'.json', 'a') as f:
+            f.write(json.dumps(out[dom])+'\n')
+
+def get_pair_indices(k, n):
+    '''
+    k -> position in condensed distance matrix
+    https://stackoverflow.com/a/36867493/4335446
+    '''
+    i = int(ceil((1/2.) * (- (-8*k + 4 *n**2 -4*n - 7)**0.5 + 2*n -1) - 1))
+    tmp = i * (n - 1 - i) + (i*(i + 1))/2
+    j = int(n - tmp + k)
+    return (i, j)
+
+def get_matrix_index(i, j, n):
+    '''
+    i and j -> indices in nodes
+    '''
+    assert i != j, "no diagonal elements in condensed matrix"
+    if i < j:
+        i, j = j, i
+    return n*j - j*(j+1)/2 + i - 1 - j
+
+class domain_error_itr:
+    def __init__(self, obj, itr):
         self.obj = obj
         self.itr = itr
-        self.domid = domid
+        self.nodes = obj.nodes
+        gc.collect()
     def __iter__(self):
         return self
 
     def next(self):
         a, b = next(self.itr)
-        return (self.obj.nodes[a].results,
-        self.obj.nodes[b].results,
-        self.obj.matrix[self.obj.get_matrix_index(self.obj.nodes.posmap[a], self.obj.nodes.posmap[b])], self.domid)
+        return (self.nodes[a].results,
+            self.nodes[b].results,
+            g_matrix[get_matrix_index(
+                self.nodes.posmap[a],
+                self.nodes.posmap[b],
+                len(self.nodes))]
+            )
 
 def get_closeness((a, b, kwargs)):
     nc = NodeComparison(a, b, **kwargs)
     return nc.closeness
 
-def get_vs_domain((a, b, distance, dom)):
-    if dom in a and dom in b:
+def get_domain_error((a, b, distance)):
+    data = list()
+    for dom in set(a.keys()).intersection(b.keys()):
         match = float(len(a[dom].intersection(b[dom])))/float(len(a[dom].union(b[dom])))
-        return True, dom, (1.0-distance) - match
-    return (False, None, None)
+        data.append((dom, match - (1.0-distance)))
+    return data
 
 class SkyClusterBuilder(ExperimentData):
     def __init__(self, limit=0, min_tests=160, **kwargs):
@@ -51,7 +101,7 @@ class SkyClusterBuilder(ExperimentData):
             try:
                 path = self.fmt_path('objectdir/linkage/'+timeid+'.json')
                 with open(path, 'r') as f:
-                    self.linkage = array(json.load(f))
+                    self.linkage = np.array(json.load(f))
             except:
                 pass
         if not hasattr(self, 'nodes'):
@@ -82,7 +132,7 @@ class SkyClusterBuilder(ExperimentData):
     @property
     def chunksize(self):
         if not hasattr(self, '_chunksize'):
-            self._chunksize = 20000
+            self._chunksize = 1000
         return self._chunksize
 
     @chunksize.setter
@@ -117,90 +167,86 @@ class SkyClusterBuilder(ExperimentData):
         with open(path, 'w') as f:
             json.dump(self.matrix, f)
 
-    def closeness_vs_domain(self, domid, workers=None):
-        if not hasattr(self, '_closeness_vs_domain_stats'):
-            if len(self.matrix) == 0:
-                self.make_closeness_matrix(workers)
-            print('comparing closeness to each domain')
-            combos = itertools.combinations(range(len(self.nodes)), 2)
-            itr = vs_dom_itr(self, combos, domid)
-            D = DataGetter(prefix=self.prefix)
-            domd = dict()
-            if not self.nodes.limit:
-                domd[D.int2dom(domid)] = full(len(self.matrix), -3.0, float)
-            else:
-                domd[D.int2dom(domid)] = full(1+((self.nodes.limit**2)/2), -3.0, float)
-            dompos = defaultdict(int)
-            count = 0
-            pool = Pool(processes=workers)
-            count = 0
-            t = time.time()
-            results = list()
-            '''
-            for item in itr:
-                res = get_vs_domain(item)
-            '''
-            for res in pool.imap_unordered(get_vs_domain, itr, self.chunksize):
-                if res[0]:
-                    domd[D.int2dom(res[1])].put(dompos[res[1]], res[2])
-                    dompos[res[1]] += 1
-                if count % 10000 == 0:
-                    print(str(count)+' --- '+str(time.time()-t))
-                count += 1
-            for dom in domd:
-                domd[dom] = [z for z in domd[dom] if z > -3]
-            with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/'+str(domid)+'.json'), 'w') as f:
-                json.dump(domd, f)
-            outd = dict()
-            maxstd = 0
-            for d in domd:
-                tmp = [abs(z) for z in domd[d]]
-                outd[d] = {
-                        'mean': mean(tmp),
-                        'median': percentile(tmp, 50),
-                        '25': percentile(tmp, 25),
-                        '75': percentile(tmp, 75),
-                        'std': std(domd[d])
-                        }
-                if outd[d]['std'] > maxstd:
-                    maxstd = outd[d]['std']
-            with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/'+str(domid)+'.json'), 'w') as f:
-                json.dump(outd, f)
+    def domain_error(self, workers=3):
+        print('comparing closeness to each domain')
+        combos = itertools.combinations(range(len(self.nodes)), 2)
+        itr = domain_error_itr(self, combos)
+        data = np.full(len(self.matrix), -5.0)
+        i = 0
+        pool0 = Pool(workers-1)
+        t = time.time()
+        data = list()
+        q = Queue()
+        dumper = Process(target=cycle_worker, args=(q,))
+        dumper.start()
+        total = 0
+        count = 0
+        for res in pool0.imap_unordered(get_domain_error, itr, self.chunksize):
+            data += res
+            count += 1
+            if count == 10000:
+                total += len(data)
+                print('total: '+str(total))
+                q.put((dump_domain_error, data))
+                count = 0
+                data = list()
+                gc.collect()
+        if len(data):
+            total += len(data)
+            q.put((dump_domain_error, data))
+        print('waiting to finish dumping')
+        q.put(('exit', True))
+        print('joining worker thread')
+        dumper.join()
+        print('joined worker thread; done')
+        t2 = time.time()
+        print(t2 - t)
 
-            self._closeness_vs_domain_stats = outd
-            self._closeness_vs_domain_raw = dict(domd)
-            print(time.time() - t)
-
-    def plot_closeness_vs_domain(self, *allstats):
-        stats = dict()
-        for dom in allstats:
-            stats.update(dom)
+    def condense_domain_error(self):
         D = DataGetter(prefix=self.prefix)
+        data = dict()
+        for dom in D.test_counts.keys():
+            uncondensed = list()
+            with open(D.datadir+'domain_error/'+str(dom)+'.json', 'r') as f:
+                for line in f:
+                    uncondensed += json.loads(line)
+            if len(uncondensed):
+                condensed = {
+                        'std': np.std(uncondensed),
+                        'raw_mean': np.mean(uncondensed),
+                        'raw_median': np.median(uncondensed),
+                        'diversity': D.diversity(dom)
+                        }
+                uncondensed = [abs(z) for z in uncondensed]
+                condensed['abs_mean'] = np.mean(uncondensed)
+                condensed['abs_median'] = np.median(uncondensed)
+                condensed['25'] = np.percentile(uncondensed, 25)
+                condensed['75'] = np.percentile(uncondensed, 75)
+                data[dom] = condensed
+        with open(D.fmt_path('datadir/domain_error/summary.json'), 'w') as f:
+            json.dump(data, f)
+
+    def plot_domain_error(self, *allstats):
+        D = DataGetter()
+        with open(D.fmt_path('datadir/domain_error/summary.json'), 'r') as f:
+            stats = json.load(f)
         mean_errs = list()
         answers = list()
         stds = list()
         tups = list()
         for dom in stats:
-            answers.append(D.diversity(dom))
-            mean_errs.append(stats[dom]['mean'])
+            mean_errs.append(stats[dom]['abs_mean'])
             stds.append(stats[dom]['std'])
-            tups.append((mean_errs[-1], stds[-1], answers[-1]))
+            answers.append(stats[dom]['diversity'])
 
-        tups = sorted(tups, key=lambda z: z[0])
-        with open(self.fmt_path('datadir/closeness_vs_dom/'+self.timeid+'/err_vs_diversity.json'), 'w') as f:
-            json.dump(tups, f)
-
-        stds = [50.0*float(z)/float(maxstd) for z in stds]
+        stds = [50.0*float(z)/float(max(stds)) for z in stds]
         fig, (ax) = plt.subplots(1, 1, figsize=(6, 6))
         ax.scatter(mean_errs, answers, stds, alpha=0.3)
         ax.set_xlabel('mean closeness error')
         ax.set_ylabel('# distinct answers')
-        fig.savefig(self.fmt_path('plotsdir/closeness_vs_dom/'+self.timeid+'.png'))
+        fig.savefig(self.fmt_path('plotsdir/domain_error/'+self.timeid+'.png'))
         plt.close(fig)
-        print(self.fmt_path('plotsdir/closeness_vs_dom/'+self.timeid+'.png'))
-        print('backing up objects...')
-        self.save_self()
-        return stats
+        print(self.fmt_path('plotsdir/domain_error/'+self.timeid+'.png'))
 
     @property
     def dendrogram_fname(self):
@@ -227,25 +273,27 @@ class SkyClusterBuilder(ExperimentData):
         self.save_self()
         return self.dendrogram_fname, self.dendrogram
 
-    def get_pair_indices(self, k):
+    def get_pair_indices(self, k, n=None):
         '''
         k -> position in condensed distance matrix
         https://stackoverflow.com/a/36867493/4335446
         '''
-        n = len(self.nodes)
+        if not n:
+            n = len(self.nodes)
         i = int(ceil((1/2.) * (- (-8*k + 4 *n**2 -4*n - 7)**0.5 + 2*n -1) - 1))
         tmp = i * (n - 1 - i) + (i*(i + 1))/2
         j = int(n - tmp + k)
         return (i, j)
 
-    def get_matrix_index(self, i, j):
+    def get_matrix_index(self, i, j, n=None):
         '''
         i and j -> indices in nodes
         '''
         assert i != j, "no diagonal elements in condensed matrix"
         if i < j:
             i, j = j, i
-        n = len(self.nodes)
+        if not n:
+            n = len(self.nodes)
         return n*j - j*(j+1)/2 + i - 1 - j
 
     def get_pair_closeness(self, i, j):
@@ -257,10 +305,23 @@ class SkyClusterBuilder(ExperimentData):
 
 if __name__ == "__main__":
 
-    b = SkyClusterBuilder(limit=500)
-    with open(b.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
-        b.kwargs['counts'] = pkl.load(f)
+    g_scb = SkyClusterBuilder(limit=500)
+
+    ''' get matrix and make dendrogram
+    with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
+        g_scb.kwargs['counts'] = pkl.load(f)
     #print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50)[0])
-    with open(b.fmt_path('datadir/matrix/matrix.json'), 'r') as f:
-        b.matrix = json.load(f)
-    b.closeness_vs_domain(5)
+    '''
+
+    ''' get domain error '''
+    with open(g_scb.fmt_path('datadir/matrix/matrix.json'), 'r') as f:
+        tmpmatrix = json.load(f)
+        g_matrix = RawArray('d', len(tmpmatrix))
+        for i, z in enumerate(tmpmatrix):
+            g_matrix[i] = z
+        g_scb.matrix = g_matrix
+        del tmpmatrix
+    gc.collect()
+    g_scb.domain_error()
+    g_scb.condense_domain_error()
+    g_scb.plot_domain_error()

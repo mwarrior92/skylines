@@ -4,6 +4,7 @@ from collections import defaultdict
 from scipy.stats import mode
 from random import sample
 from numpy import array, ndarray, zeros
+import gc
 
 pandas.options.mode.chained_assignment = None
 
@@ -99,6 +100,7 @@ class Nodes(ExperimentData):
             self.probes_df = self.probes_df.apply(lambda z: ChangePrefix(z, self.prefix), axis=1)
 
         print('done applying rules')
+        gc.collect()
 
     @property
     def prefix(self):
@@ -117,6 +119,7 @@ class Nodes(ExperimentData):
         groups = self.probes_df.groupby('probe', as_index=False)
         print('aggregating probes')
         self.probes_df = groups.aggregate(lambda z: list(z))
+        del groups
         self.probes_df = self.probes_df.apply(CollapsedNode, axis=1)
 
     def group_by_src_addr(self):
