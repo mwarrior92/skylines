@@ -1,41 +1,18 @@
 \section{Experiment Overview} \label{oversky}
 
-I aim to establish a baseline by which to compare client labeling systems relative to how well they
-capture the similarity of clients with regards to their DNS query answers across a large set of
-domains. Clients exposed to the same set of resources should appear to be similar and thus grouped
-together by a labeling scheme. Likewise, clients exposed to different resources should appear
-disimilar. With this in mind, I opt to use the Jaccard index as inspiration for a simple distance
-measure, which I will refer to as closeness. Closeness is explicitly defined in Section
-\ref{closeness}.
-Essentially, clients with high closeness scores have a large number of network resources in common
-(a high degree of CNRE). 
+\begin{figure}
+    \epsfig{file=figs/country_cdf.png}
+    \caption{diagram illustrating how domains were collected}
+\end{figure}
 
-In Section \ref{skyfinds}, I calculate pairwise closeness scores for thousands of clients spread across the
-globe. I then group results by a series of conventional naming systems (prefix, /24, AS number, and
-country) for further analysis. The continuity of possible closeness values --- which span from 0 to
-1 --- give us a mechanism by which we can gauge how well the various labeling schemes are aligned
-with the degree overlap in clients' resource exposure. If a labeling scheme is well aligned, we
-should be able to expect clients with the same label to be directed to most of the same
-endpoints. 
+\begin{figure}
+    \epsfig{file=figs/country_cdf.png}
+    \caption{# of sites touched vs # domains used (done)}
+\end{figure}
 
-Given that closeness is a distance measure, it may be possible to derive some manner of grouping
-from the matrix of pairwise results. In Section \ref{propsky}, I propose applying clustering techniques to
-the dataset to gain an understanding of the broader relationship between clients in terms of their
-closness. This manner grouping clients will form the basis of what I refer to as the Skyline model.
-
-\subsection{Closeness Definition} \label{closeness}
-
-Consider two clients, $p$ and $q$,  who have each resolved $d$ domains, taking the first answer from
-each query.  Suppose I were to compare the each client's remaining answer for the first domain,
-$d_0$. If the clients were directed to the same resource, client $p$'s answer, $A_0p$, should match
-client $q$'s answer, $A_0q$. If I were to continue performing such comparisons across all $d$
-domains, I would arrive with a list of booleans, attributing matches result in true values and
-mismatches to false.  I define the closeness of two clients as $t / d$, where $t$ is the number of
-true values from the list of booleans. 
-
-For now and through my preliminary experiements, I consider only answers within the
-same /24 prefix to be \emph{matching}, as /24 is generally the largest routable prefix in IPv4.
-However, it is worth noting that it is very possible for large datacenters to include multiple /24
-blocks or smaller prefixes. I address this further in the Proposal portion of this document.
+\begin{figure}
+    \epsfig{file=figs/country_cdf.png}
+    \caption{\% links covered per site vs # domains used (done)}
+\end{figure}
 
 

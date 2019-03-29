@@ -26,6 +26,11 @@ from each other in terms of their \emph{common network resource exposure} (CNRE)
 terms highlights what should be a chief concern in large scale Internet measurement platforms and
 network optimization efforts: the sets of clients actually being directed the same resources.
 
+\begin{figure}
+    \epsfig{file=figs/country_cdf.png}
+    \caption{Diagram illustration resource selection}
+\end{figure}
+
 In order to develop the Skyline model, I performed an exhaustive set of measurements to frame
 client experience on a per \emph{site} basis. In my completed, preliminary work, I capture a
 snapshot of both DNS resolutions and latency measurements toward the 304 domains that appeared most
@@ -79,4 +84,4 @@ use in this project, their goals and contributions run parallel to what I aim to
 seek to identify the properties and locations of CDN resources; conversely, I seek to identify the
 target pools (sets of clients) of overlapping CDN resource catchments \cite{webcart, Calder2013,
 benson11}. Other work close to this space investigates the performance of a particular CDN
-deployment scheme \cite{ecs15sigcomm}. 
+deployment scheme \cite{ecs15sigcomm}.
