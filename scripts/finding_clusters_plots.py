@@ -8,6 +8,7 @@ import numpy as np
 import itertools
 from experimentdata import DataGetter
 import clusterAnalysis
+import skyresolvers
 
 def make_dendrogram():
     scb = skyclusters.SkyClusterBuilder(limit=500)
@@ -121,34 +122,90 @@ def make_pings_vs_crne(workers=2, chunksize=500):
     q.put(('exit', True))
     dumper.join()
 
-def make_completeness(workers=2, **kwargs):
+def make_homogeneity_and_completeness(workers=2, **kwargs):
+    ''' also gets homogeneity '''
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder(**kwargs)
     g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
     with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
         g_scb.kwargs['counts'] = pkl.load(f)
+    global g_ca
     g_ca = clusterAnalysis.ClusterAnalysis(scb=g_scb)
     skyclusters.gc.collect()
-    categories = ['country', 'asn', 'prefix', 'ip24', 'resolvers']
-    thresholds = np.arange(0.1, 1.0, 0.1)
+    categories = ['country'] #, 'asn', 'prefix', 'ip24']
+    thresholds = np.arange(0.05, 1.0, 0.05)
     itr = itertools.product(categories, thresholds)
     global q
     q = Queue()
+    pool = Pool(workers)
     dumper = Process(target=cycle_worker, args=(q,))
     dumper.start()
-    for category, threshold, data in pool.imap_unordered(get_completeness, itr):
-        q.put(('dump_completeness', (category, data)))
+    for res in pool.imap_unordered(get_homogeneity_and_completeness, itr):
+        q.put((dump_homogeneity_and_completeness, res))
     q.put(('exit', True))
     dumper.join()
 
 
-def get_completeness((category, threshold, **kwargs)):
-    clusters = g_ca.grouped_clusters(threshold, **kwargs)
-    return g_ca.get_homogeneity_and_completeness(clusters, category)
+def make_homogeneity_and_completeness_for_resolvers(workers=2, **kwargs):
+    ''' also gets homogeneity '''
+    global g_scb
+    g_scb = skyclusters.SkyClusterBuilder(**kwargs)
+    g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
+    '''
+    2 things happening here:
+        1) reducing probes to those with at least one public resolver
+        2) picking the most "common" (across all probes) resolver observed by probe to label said probe
+    '''
+    R = skyresolvers.Resolvers()
+    invR = R.get_inverse()
+    keep = set()
+    for resolver in invR:
+        keep.update(invR[resolver])
+    g_scb.nodes._probes_df = g_scb.nodes._probes_df.loc[g_scb.nodes._probes_df['probe'].isin(keep)]
+    with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
+        g_scb.kwargs['counts'] = pkl.load(f)
+    keys = sorted(list(invR.keys()), key=lambda z: len(invR[z]))
+    probes = dict()
+    while len(keep):
+        key = keys.pop()
+        for probe in invR[key]:
+            if key in keep:
+                probes[probe] = key
+                keep.remove(probe)
+                if len(keep) == 0:
+                    break
+    resolvers = [probes[z] for z in g_scb.nodes._probes_df.probe.to_list()]
+    g_scb.nodes._probes_df = g_scb.nodes._probes_df.assign(resolvers=resolvers)
+    global g_ca
+    g_ca = clusterAnalysis.ClusterAnalysis(scb=g_scb)
+    skyclusters.gc.collect()
+    categories = ['resolvers']
+    thresholds = np.arange(0.05, 1.0, 0.05)
+    itr = itertools.product(categories, thresholds)
+    global q
+    q = Queue()
+    pool = Pool(workers)
+    dumper = Process(target=cycle_worker, args=(q,))
+    dumper.start()
+    for res in pool.imap_unordered(get_homogeneity_and_completeness, itr):
+        q.put((dump_homogeneity_and_completeness, res))
+    q.put(('exit', True))
+    dumper.join()
 
 
-def dump_completeness((category, threshold, data)):
+def get_homogeneity_and_completeness((category, threshold)):
+    clusters = g_ca.get_clusters(threshold, method='complete')
+    data = g_ca.get_homogeneity_and_completeness(clusters, category)
+    data['category'] = category
+    data['threshold'] = threshold
+    data['nclusters'] = len(set(clusters))
+    return data
+
+def dump_homogeneity_and_completeness(data):
     D = DataGetter()
-    with open(D.fmt_path('datadir/completeness/'+category+'.json'), 'a') as f:
-        f.write(json.dumps([threshold, data])+'\n')
+    with open(D.fmt_path('datadir/homogeneity_and_completeness/'+data['category']+'.json'), 'a') as f:
+        f.write(json.dumps(data)+'\n')
 
+
+if __name__ == '__main__':
+    make_homogeneity_and_completeness()

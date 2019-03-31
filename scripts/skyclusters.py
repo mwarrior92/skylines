@@ -313,6 +313,24 @@ class SkyClusterBuilder(ExperimentData):
     def crne(self, i, j):
         return self.matrix[self.get_matrix_index(i, j)]
 
+    def reduce_matrix_to_sampled(self):
+        ''' TODO: IMPORTANT hard coded in the number of nodes; take this out if reusing code on new dataset '''
+        print('reducing matrix')
+        if len(self.nodes) == 9024:
+            return
+        matrix = np.zeros(len(list(itertools.combinations(range(len(self.nodes)), 2))))
+        for a,b in itertools.combinations(range(len(self.nodes)), 2):
+            i = get_matrix_index(a,b,len(self.nodes))
+            A = self.nodes.posmap[a]
+            B = self.nodes.posmap[b]
+            I = get_matrix_index(A,B,9024)
+            matrix[i] = self.matrix[i]
+        del self.matrix
+        self.matrix = matrix
+        for i in range(len(self.nodes)):
+            self.nodes.posmap[i] = i
+
+
 
 if __name__ == "__main__":
 

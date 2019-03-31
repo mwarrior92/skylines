@@ -48,12 +48,13 @@ class ClusterAnalysis(ExperimentData):
     def linkage(self, method='complete', **kwargs):
         m = 'linkage_'+method
         if not hasattr(self, m):
-            setattr(self, m, hierarchy.linkage(self.scb.matrix, method='complete'))
+            setattr(self, m, hierarchy.linkage(self.scb.matrix, method=method))
         return getattr(self, m)
 
-    def get_clusters(self, cut, **kwargs):
+    def get_clusters(self, threshold, **kwargs):
+        print('getting clusters')
         L = self.linkage(**kwargs)
-        data = hierarchy.fcluster(L, cut)
+        data = hierarchy.fcluster(L, threshold)
         return data
 
     def grouped_clusters(self, data=None, threshold=None, **kwargs):
@@ -64,8 +65,7 @@ class ClusterAnalysis(ExperimentData):
             return [np.nonzero(data == z)[0] for z in set(data)]
 
     def get_homogeneity_and_completeness(self, clusters, category):
-        indices = np.arange(len(clusters))
-        labels = getattr(self.scb.nodes, 'to_'+category)(indices)
+        labels = getattr(self.scb.nodes, 'to_'+category)(range(len(self.scb.nodes)))
         keys = dict()
         for i, label in enumerate(labels):
             if label not in keys:

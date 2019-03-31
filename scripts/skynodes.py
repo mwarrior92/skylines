@@ -270,6 +270,8 @@ class Nodes(ExperimentData):
         return len(self.probes_df)
 
     def to_(self, key):
+        if key == 'resolvers' and key not in self._probes_df.columns.to_list():
+            self.load_resolvers()
         def func(item):
             if type(item) in [list, ndarray, set]:
                 out = zeros(len(item), dtype=object)
