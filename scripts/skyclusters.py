@@ -1,7 +1,7 @@
 from skycompare import NodeComparison, count_answers_across_nodes
 from skynodes import Nodes
 from experimentdata import ExperimentData, DataGetter
-from multiprocessing import Pool, Process, Queue, Condition
+from multiprocessing import Pool, Process, Queue
 from multiprocessing.sharedctypes import RawArray
 import itertools
 from scipy.cluster.hierarchy import dendrogram, linkage, cophenet
@@ -44,7 +44,8 @@ def get_pair_indices(k, n):
     https://stackoverflow.com/a/36867493/4335446
     '''
     i = int(ceil((1/2.) * (- (-8*k + 4 *n**2 -4*n - 7)**0.5 + 2*n -1) - 1))
-    tmp = i * (n - 1 - i) + (i*(i + 1))/2
+    I = i + 1
+    tmp = I * (n - 1 - I) + (I*(I + 1))/2
     j = int(n - tmp + k)
     return (i, j)
 
@@ -106,6 +107,16 @@ class SkyClusterBuilder(ExperimentData):
                 pass
         if not hasattr(self, 'nodes'):
             self.nodes = Nodes(limit=limit, min_tests=min_tests, **kwargs)
+
+    def load_matrix_from_file(self, fname):
+        with open(self.fmt_path(fname), 'r') as f:
+            tmpmatrix = json.load(f)
+            global g_matrix
+            g_matrix = RawArray('d', len(tmpmatrix))
+            for i, z in enumerate(tmpmatrix):
+                g_matrix[i] = z
+            self.matrix = g_matrix
+            del tmpmatrix
 
     def save_self(self, timeid=None):
         if timeid is None:

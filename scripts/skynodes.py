@@ -5,6 +5,8 @@ from scipy.stats import mode
 from random import sample
 from numpy import array, ndarray, zeros
 import gc
+import skyresolvers
+import skypings
 
 pandas.options.mode.chained_assignment = None
 
@@ -71,6 +73,24 @@ class Nodes(ExperimentData):
             path = self.fmt_path('objectdir/probes_df/'+timeid+'.json')
             self._probes_df.to_json(path)
         super(type(self),self).save_self(timeid)
+
+    def load_resolvers(self):
+        r = skyresolvers.Resolvers()
+        self._probes_df = self._probes_df.assign(resolvers=[list(r[z]) for z \
+                in self._probes_df.probe])
+
+    def load_pings(self):
+        p = skypings.Pings()
+        self._probes_df = self._probes_df.assign(resolvers=[list(p.get_ping_stats(z)) for z \
+                in self._probes_df.probe])
+
+    def keep_only(self, fields):
+        fields = set(fields)
+        fields.add('idx')
+        fields.add('probe')
+        drops = [z for z in self._probes_df.columns.to_list() if z not in fields]
+        self._probes_df.drop(columns=drops)
+        gc.collect()
 
     def apply_rules(self):
         print('applying rules')

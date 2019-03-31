@@ -7,7 +7,7 @@ from collections import defaultdict
 from sklearn.metrics.cluster import homogeneity_score, completeness_score
 
 class ClusterAnalysis(ExperimentData):
-    def __init__(self, matrix_file, **kwargs):
+    def __init__(self, matrix_file=None, **kwargs):
         for k in kwargs:
             setattr(self, k, kwargs[k])
 
@@ -54,10 +54,14 @@ class ClusterAnalysis(ExperimentData):
     def get_clusters(self, cut, **kwargs):
         L = self.linkage(**kwargs)
         data = hierarchy.fcluster(L, cut)
-        return clusters
+        return data
 
-    def grouped_clusters(self, data):
-        return [np.nonzero(data == z)[0] for z in set(data)]
+    def grouped_clusters(self, data=None, threshold=None, **kwargs):
+        if data:
+            return [np.nonzero(data == z)[0] for z in set(data)]
+        else:
+            data = self.get_clusters(threshold, **kwargs)
+            return [np.nonzero(data == z)[0] for z in set(data)]
 
     def get_homogeneity_and_completeness(self, clusters, category):
         indices = np.arange(len(clusters))

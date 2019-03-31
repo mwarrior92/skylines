@@ -59,17 +59,15 @@ class NodeComparison(ExperimentData):
     def closeness(self):
         '''
         calculate and return closeness between a and b
+        NOTE: this is actually distance (1 - closeness)
         '''
         if hasattr(self, '_closeness'):
             return self._closeness
         n = 0
         d = 0
-        domd = dict()
         for dom in self.shared_domains:
             aRes = self.a.results[dom]
             bRes = self.b.results[dom]
-            # all_ans = list(aRes) + list(bRes)
-            # shared_ans = aRes.intersection(bRes)
             ans_weight = float(sum([self.counts[(dom, z)] for xRes in [aRes, bRes] for z in xRes]))
             # this will be zero if nothing matches
             matches = float(len(aRes.intersection(bRes))) / float(len(aRes.union(bRes)))

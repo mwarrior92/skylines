@@ -6,20 +6,24 @@ import numpy as np
 class Pings(ExperimentData):
     def __init__(self, fname=None, pings=None):
         self.pings = pings
-        self.fname = fname
         if self.pings is None:
-            self.load_pings()
+            self.load_pings(fname)
 
-    def load_pings(self):
+    def load_pings(self, fname=None):
+        if fname is None:
+            fname = self.fmt_path('datadir/pings/pingdata.json')
         self.pings = pandas.read_json(fname, lines=True)
 
     def get_pings(self, nodes, domain=None):
-        if type(nodes) is not list:
-            nodes = [nodes]
-        if domain:
-            return self.pings[(self.pings['prb'].isin(nodes)) & (self.pings['domain'] == domain)]
-        else:
-            return self.pings[self.pings['prb'].isin(nodes)]
+        try:
+            if type(nodes) is not list:
+                nodes = [nodes]
+            if domain:
+                return self.pings[(self.pings['prb'].isin(nodes)) & (self.pings['domain'] == domain)]
+            else:
+                return self.pings[self.pings['prb'].isin(nodes)]
+        except KeyError:
+            return -1.0
 
     def get_flat_pings(self, *args, **kwargs):
         pings = self.get_pings(*args, **kwargs)

@@ -15,7 +15,7 @@ class ExperimentData(object):
 
     @property
     def timestr(self):
-        return strftime('%Y%d%H%M', localtime())
+        return strftime('%Y%m%d%H%M', localtime())
 
     @property
     def timeid(self):
