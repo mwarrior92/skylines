@@ -54,7 +54,7 @@ class ClusterAnalysis(ExperimentData):
     def get_clusters(self, threshold, **kwargs):
         print('getting clusters')
         L = self.linkage(**kwargs)
-        data = hierarchy.fcluster(L, threshold)
+        data = hierarchy.fcluster(L, threshold, 'distance')
         return data
 
     def grouped_clusters(self, data=None, threshold=None, **kwargs):
