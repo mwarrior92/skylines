@@ -132,7 +132,7 @@ def make_homogeneity_and_completeness(workers=2, **kwargs):
     global g_ca
     g_ca = clusterAnalysis.ClusterAnalysis(scb=g_scb)
     skyclusters.gc.collect()
-    categories = ['country'] #, 'asn', 'prefix', 'ip24']
+    categories = ['country', 'asn', 'prefix', 'ip24']
     thresholds = np.arange(0.05, 1.0, 0.05)
     itr = itertools.product(categories, thresholds)
     global q
