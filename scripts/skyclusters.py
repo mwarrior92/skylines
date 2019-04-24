@@ -311,7 +311,9 @@ class SkyClusterBuilder(ExperimentData):
         return self.matrix[self.get_matrix_index(i, j)]
 
     def crne(self, i, j):
-        return self.matrix[self.get_matrix_index(i, j)]
+        A = self.nodes.posmap[i]
+        B = self.nodes.posmap[j]
+        return self.matrix[self.get_matrix_index(A, B)]
 
     def reduce_matrix_to_sampled(self):
         ''' TODO: IMPORTANT hard coded in the number of nodes; take this out if reusing code on new dataset '''

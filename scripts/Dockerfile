@@ -11,6 +11,8 @@ RUN mkdir /objects
 RUN mkdir /plots
 WORKDIR /scripts
 RUN mkdir -p /root/.config/matplotlib
+COPY matplotlibrc /root/.config/matplotlib/matplotlibrc
 RUN echo "backend : Agg" > /root/.config/matplotlib/matplotlibrc
-CMD [ "python", "yeah.py" ]
+RUN pip install -U scikit-learn
+CMD [ "python", "finding_clusters_plots.py" ]
 

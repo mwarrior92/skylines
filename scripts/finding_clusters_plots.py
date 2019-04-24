@@ -9,6 +9,10 @@ import itertools
 from experimentdata import DataGetter
 import clusterAnalysis
 import skyresolvers
+import pandas
+from matplotlib import pyplot as plt
+from statsmodels.distributions.empirical_distribution import ECDF
+import time
 
 def make_dendrogram():
     scb = skyclusters.SkyClusterBuilder(limit=500)
@@ -133,6 +137,10 @@ def make_homogeneity_and_completeness(workers=2, **kwargs):
     g_ca = clusterAnalysis.ClusterAnalysis(scb=g_scb)
     skyclusters.gc.collect()
     categories = ['country', 'asn', 'prefix', 'ip24']
+    for category in categories:
+        data = list(set(g_scb.nodes.probes_df[category]))
+        with open(g_scb.fmt_path('datadir/homogeneity_and_completeness/labelsets/'+category+'.json'), 'w') as f:
+            json.dump(data, f)
     thresholds = np.arange(0.05, 1.0, 0.05)
     itr = itertools.product(categories, thresholds)
     global q
@@ -162,6 +170,7 @@ def make_homogeneity_and_completeness_for_resolvers(workers=2, **kwargs):
     for resolver in invR:
         keep.update(invR[resolver])
     g_scb.nodes._probes_df = g_scb.nodes._probes_df.loc[g_scb.nodes._probes_df['probe'].isin(keep)]
+    g_scb.reduce_matrix_to_sampled()
     with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
         g_scb.kwargs['counts'] = pkl.load(f)
     keys = sorted(list(invR.keys()), key=lambda z: len(invR[z]))
@@ -169,12 +178,15 @@ def make_homogeneity_and_completeness_for_resolvers(workers=2, **kwargs):
     while len(keep):
         key = keys.pop()
         for probe in invR[key]:
-            if key in keep:
+            if probe in keep:
                 probes[probe] = key
                 keep.remove(probe)
                 if len(keep) == 0:
                     break
     resolvers = [probes[z] for z in g_scb.nodes._probes_df.probe.to_list()]
+    resolvers_set = list(set(resolvers))
+    with open(g_scb.fmt_path('datadir/homogeneity_and_completeness/labelsets/resolvers.json'), 'w') as f:
+        json.dump(resolvers_set, f)
     g_scb.nodes._probes_df = g_scb.nodes._probes_df.assign(resolvers=resolvers)
     global g_ca
     g_ca = clusterAnalysis.ClusterAnalysis(scb=g_scb)
@@ -206,6 +218,109 @@ def dump_homogeneity_and_completeness(data):
     with open(D.fmt_path('datadir/homogeneity_and_completeness/'+data['category']+'.json'), 'a') as f:
         f.write(json.dumps(data)+'\n')
 
+def plot_homogeneity_and_completeness(category):
+    print(category)
+    D = DataGetter()
+    data = pandas.read_json(D.fmt_path('datadir/homogeneity_and_completeness/'+category+'.json'), lines=True)
+    data = data.sort_values(by=['threshold'])
+    with open(D.fmt_path('datadir/homogeneity_and_completeness/labelsets/'+category+'.json'), 'r') as f:
+        labelset = json.load(f)
+    x = data.threshold.to_list()
+    y1 = data.homogeneity.to_list()
+    y2 = data.completeness.to_list()
+    y3 = data.nclusters.to_list()
+    fig, (ax) = plt.subplots(1,1)
+    ax2 = ax.twinx()
+    l1 = ax.plot(x,y1, '--', label='homogeneity')
+    l2 = ax.plot(x,y2, label='completeness')
+    l3 = ax2.plot(x,y3, 'r:', label='# clusters')
+    ax2.axhline(len(labelset), color='k')
+    lines = l1+l2+l3
+    ax2.set_yscale('log')
+    ax.set_xlabel('distance threshold')
+    ax.set_ylabel('H & C')
+    ax2.set_ylabel('# clusters')
+    ax.legend(lines, [z.get_label() for z in lines])
+    ax.set_ylim([0,1])
+    fig.savefig(D.fmt_path('plotsdir/homogeneity_and_completeness/'+category+'.png'))
+
+
+def plot_closeness_for_category(category, **kwargs):
+    g_scb = skyclusters.SkyClusterBuilder(**kwargs)
+    g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
+    nodes = g_scb.nodes.probes_df
+    labels = set(nodes[category].to_list())
+    stats = list()
+    diffstats = list()
+    styles = itertools.cycle(['-', '--', '-.', ':'])
+    all_crnes = list()
+    diff_crnes = list()
+    for label in labels:
+        crnes = list()
+        indices = nodes.loc[nodes[category] == label].idx.to_list()
+        others = [z for z in range(len(nodes)) if z not in indices]
+        if len(indices) < 2:
+            continue
+        for a,b in itertools.combinations(indices, 2):
+            crnes.append(1.0-g_scb.crne(a,b))
+        stats.append({
+            'median': np.median(crnes),
+            'size': len(indices),
+            'label': label
+            })
+        all_crnes += crnes
+        crnes = list()
+        for a,b in itertools.product(indices, others):
+            crnes.append(1.0-g_scb.crne(a,b))
+        diffstats.append({
+            'median': np.median(crnes),
+            'size': len(indices),
+            'label': label
+            })
+        diff_crnes += crnes
+
+    fig, (ax) = plt.subplots(1,1)
+    ecdf = ECDF(all_crnes)
+    x, y = list(ecdf.x), list(ecdf.y)
+    l1 = ax.plot(x,y, next(styles), label='same')
+    ecdf = ECDF(diff_crnes)
+    x, y = list(ecdf.x), list(ecdf.y)
+    ld1 = ax.plot(x,y, next(styles), label='diff')
+    ecdf = ECDF([z['median'] for z in stats])
+    x, y = list(ecdf.x), list(ecdf.y)
+    l2 = ax.plot(x,y, next(styles), label='same median')
+    ecdf = ECDF([z['median'] for z in stats])
+    x, y = list(ecdf.x), list(ecdf.y)
+    ld2 = ax.plot(x,y, next(styles), label='diff median')
+    ax2 = ax.twinx()
+    x, y = zip(*sorted([(z['median'], z['size']) for z in stats], key=lambda w: w[0]))
+    l3 = ax2.plot(x, y, 'r'+next(styles), label='label size')
+    lines = l1+l2+l3
+    ax.legend(lines, [z.get_label() for z in lines])
+    img = g_scb.fmt_path('plotsdir/closeness_for_category/'+category+'.png')
+    plt.close(fig)
+    ax.set_xlabel('CRNE')
+    ax.set_ylabel('CDF')
+    ax2.set_ylabel('label size')
+    print(img)
+    fig.savefig(img)
+    with open(g_scb.fmt_path('datadir/closeness_for_category/'+category+'_same.json'), 'w') as f:
+        json.dump(stats, f)
+    with open(g_scb.fmt_path('datadir/closeness_for_category/'+category+'_diff.json'), 'w') as f:
+        json.dump(diffstats, f)
+
 
 if __name__ == '__main__':
+    '''
     make_homogeneity_and_completeness()
+    make_homogeneity_and_completeness_for_resolvers()
+    plot_homogeneity_and_completeness('country')
+    plot_homogeneity_and_completeness('ip24')
+    plot_homogeneity_and_completeness('prefix')
+    plot_homogeneity_and_completeness('asn')
+    plot_homogeneity_and_completeness('resolvers')
+    '''
+    plot_closeness_for_category('ip24')
+    plot_closeness_for_category('prefix')
+    plot_closeness_for_category('asn')
+    plot_closeness_for_category('country')
