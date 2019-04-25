@@ -1,3 +1,4 @@
+import sys
 import skyclusters
 from skycompare import NodeComparison
 import json
@@ -13,6 +14,8 @@ import pandas
 from matplotlib import pyplot as plt
 from statsmodels.distributions.empirical_distribution import ECDF
 import time
+from matplotlib import cm
+from collections import defaultdict
 
 def make_dendrogram():
     scb = skyclusters.SkyClusterBuilder(limit=500)
@@ -245,69 +248,93 @@ def plot_homogeneity_and_completeness(category):
     fig.savefig(D.fmt_path('plotsdir/homogeneity_and_completeness/'+category+'.png'))
 
 
-def plot_closeness_for_category(category, **kwargs):
-    g_scb = skyclusters.SkyClusterBuilder(**kwargs)
-    g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
-    nodes = g_scb.nodes.probes_df
-    labels = set(nodes[category].to_list())
-    stats = list()
-    diffstats = list()
-    styles = itertools.cycle(['-', '--', '-.', ':'])
-    all_crnes = list()
-    diff_crnes = list()
-    for label in labels:
-        crnes = list()
-        indices = nodes.loc[nodes[category] == label].idx.to_list()
-        others = [z for z in range(len(nodes)) if z not in indices]
-        if len(indices) < 2:
-            continue
+def get_same_diff_for_pair((category, label)):
+    sys.stdout.flush()
+    indices = nodes.loc[nodes[category] == label].idx.to_list()
+    others = nodes.loc[nodes[category] != label].idx.to_list()
+    crnes = list()
+    data = {'l': label, 'c': category, 'sz': len(indices)}
+    if len(indices) > 1:
         for a,b in itertools.combinations(indices, 2):
-            crnes.append(1.0-g_scb.crne(a,b))
-        stats.append({
-            'median': np.median(crnes),
-            'size': len(indices),
-            'label': label
-            })
-        all_crnes += crnes
-        crnes = list()
-        for a,b in itertools.product(indices, others):
-            crnes.append(1.0-g_scb.crne(a,b))
-        diffstats.append({
-            'median': np.median(crnes),
-            'size': len(indices),
-            'label': label
-            })
-        diff_crnes += crnes
+            crnes.append(1.0-scb.crne(a,b))
+        data['sm'] = np.median(crnes)
+        data['smn'] = np.mean(crnes)
+        data['std'] = np.std(crnes)
+    crnes = list()
+    for a,b in itertools.product(indices, others):
+        crnes.append(1.0-scb.crne(a,b))
+    data['df'] = np.median(crnes)
+    return data
 
-    fig, (ax) = plt.subplots(1,1)
-    ecdf = ECDF(all_crnes)
-    x, y = list(ecdf.x), list(ecdf.y)
-    l1 = ax.plot(x,y, next(styles), label='same')
-    ecdf = ECDF(diff_crnes)
-    x, y = list(ecdf.x), list(ecdf.y)
-    ld1 = ax.plot(x,y, next(styles), label='diff')
-    ecdf = ECDF([z['median'] for z in stats])
-    x, y = list(ecdf.x), list(ecdf.y)
-    l2 = ax.plot(x,y, next(styles), label='same median')
-    ecdf = ECDF([z['median'] for z in stats])
-    x, y = list(ecdf.x), list(ecdf.y)
-    ld2 = ax.plot(x,y, next(styles), label='diff median')
-    ax2 = ax.twinx()
-    x, y = zip(*sorted([(z['median'], z['size']) for z in stats], key=lambda w: w[0]))
-    l3 = ax2.plot(x, y, 'r'+next(styles), label='label size')
-    lines = l1+l2+l3
-    ax.legend(lines, [z.get_label() for z in lines])
-    img = g_scb.fmt_path('plotsdir/closeness_for_category/'+category+'.png')
-    plt.close(fig)
-    ax.set_xlabel('CRNE')
-    ax.set_ylabel('CDF')
-    ax2.set_ylabel('label size')
-    print(img)
-    fig.savefig(img)
-    with open(g_scb.fmt_path('datadir/closeness_for_category/'+category+'_same.json'), 'w') as f:
-        json.dump(stats, f)
-    with open(g_scb.fmt_path('datadir/closeness_for_category/'+category+'_diff.json'), 'w') as f:
-        json.dump(diffstats, f)
+
+def plot_closeness_for_category(**kwargs):
+    global scb
+    scb = skyclusters.SkyClusterBuilder(**kwargs)
+    scb.load_matrix_from_file('datadir/matrix/matrix.json')
+    global nodes
+    nodes = scb.nodes.probes_df
+    categories = ['asn', 'prefix', 'country', 'ip24']
+    labels = [(category, set(nodes[category].tolist())) for category in categories]
+    labels = [y for z in labels for y in list(itertools.product([z[0]], z[1]))]
+    sames = defaultdict(list)
+    diffs = defaultdict(list)
+    sizes = list()
+    count = 0
+    fname = scb.fmt_path('datadir/closeness_vs_category/data.json')
+    with open(fname, 'w') as f:
+        f.write('')
+    data = list()
+    pool = Pool(2)
+    for res in pool.imap_unordered(get_same_diff_for_pair, labels, 100):
+        try:
+            sames[res['c']].append(res['sm'])
+            # (label, median, size)
+            sizes.append((res['l'], res['smn'], res['sz'], str(res['std'])))
+        except KeyError:
+            pass
+        diffs[res['c']].append(res['df'])
+        if count % 100 == 0:
+            print(res)
+            sys.stdout.flush()
+            with open(fname, 'a') as f:
+                f.write(json.dumps(data)+'\n')
+            data = list()
+        count += 1
+    if data:
+        with open(fname, 'a') as f:
+            f.write(json.dumps(data)+'\n')
+        del data
+
+    data = dict()
+    for category in diffs:
+        fig, (ax) = plt.subplots(1,1)
+        styles = itertools.cycle(['-', '--', '-.', ':'])
+        ecdf = ECDF(diffs[category])
+        lines = list()
+        xd, yd = list(ecdf.x), list(ecdf.y)
+        lines += ax.plot(xd,yd, next(styles), label='same')
+        ecdf = ECDF(sames[category])
+        xs, ys = list(ecdf.x), list(ecdf.y)
+        lines += ax.plot(xs,ys, next(styles), label='diff')
+        m = np.percentile(diffs[category], 95)
+        ax.axvline(m, color='r', linewidth=0.7)
+        ax.legend(lines, [z.get_label() for z in lines])
+        ax.set_xlabel('median CRNE')
+        ax.set_ylabel('CDF')
+        fig.savefig(scb.fmt_path('plotsdir/closeness_vs_category/'+category+'.png'))
+        plt.close(fig)
+        with open(scb.fmt_path('datadir/closeness_vs_category/'+category+'.json'),'w') as f:
+            json.dump({'same': (xs,ys), 'diff': (xd,yd), 'm': m}, f)
+    fig3, (ax3) = plt.subplots(1,1)
+    _, x, y, stds = zip(*sizes)
+    scatter = ax3.scatter(x, y, c=stds, edgecolors='k')
+    ax3.set_xlabel('mean CRNE')
+    ax3.set_ylabel('label group size')
+    plt.colorbar(scatter, ticks=np.arange(0.0, 1.01, 0.2))
+    fig3.savefig(scb.fmt_path('plotsdir/closeness_vs_category/size.png'))
+    plt.close(fig3)
+    with open(scb.fmt_path('datadir/closeness_vs_category/size.json'), 'w') as f:
+        json.dump({'means': x, 'sizes': y, 'stds': stds}, f)
 
 
 if __name__ == '__main__':
@@ -320,7 +347,4 @@ if __name__ == '__main__':
     plot_homogeneity_and_completeness('asn')
     plot_homogeneity_and_completeness('resolvers')
     '''
-    plot_closeness_for_category('ip24')
-    plot_closeness_for_category('prefix')
-    plot_closeness_for_category('asn')
-    plot_closeness_for_category('country')
+    plot_closeness_for_category()
