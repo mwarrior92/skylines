@@ -16,6 +16,7 @@ from statsmodels.distributions.empirical_distribution import ECDF
 import time
 from matplotlib import cm
 from collections import defaultdict
+import geopandas as gp
 
 def make_dendrogram():
     scb = skyclusters.SkyClusterBuilder(limit=500)
@@ -238,6 +239,8 @@ def plot_homogeneity_and_completeness(category):
     l2 = ax.plot(x,y2, label='completeness')
     l3 = ax2.plot(x,y3, 'r:', label='# clusters')
     ax2.axhline(len(labelset), color='k')
+    vind, _ = min([(i,abs(n-len(labelset))) for i,n in enumerate(y3)], key=lambda z: z[1])
+    ax.axvline(x[vind], color='green')
     lines = l1+l2+l3
     ax2.set_yscale('log')
     ax.set_xlabel('distance threshold')
@@ -249,9 +252,9 @@ def plot_homogeneity_and_completeness(category):
 
 
 def get_same_diff_for_pair((category, label)):
+    sys.stdout.write(str(label)+', ')
     sys.stdout.flush()
     indices = nodes.loc[nodes[category] == label].idx.to_list()
-    others = nodes.loc[nodes[category] != label].idx.to_list()
     crnes = list()
     data = {'l': label, 'c': category, 'sz': len(indices)}
     if len(indices) > 1:
@@ -260,10 +263,15 @@ def get_same_diff_for_pair((category, label)):
         data['sm'] = np.median(crnes)
         data['smn'] = np.mean(crnes)
         data['std'] = np.std(crnes)
-    crnes = list()
-    for a,b in itertools.product(indices, others):
-        crnes.append(1.0-scb.crne(a,b))
-    data['df'] = np.median(crnes)
+    mcrnes = list()
+    for lbl in g_inds[category]:
+        if lbl == label:
+            continue
+        crnes = list()
+        for a,b in itertools.product(indices, g_inds[category][lbl]):
+            crnes.append(1.0-scb.crne(a,b))
+        mcrnes.append(np.median(crnes))
+    data['df'] = np.median(mcrnes)
     return data
 
 
@@ -276,6 +284,12 @@ def plot_closeness_for_category(**kwargs):
     categories = ['asn', 'prefix', 'country', 'ip24']
     labels = [(category, set(nodes[category].tolist())) for category in categories]
     labels = [y for z in labels for y in list(itertools.product([z[0]], z[1]))]
+    global g_inds
+    g_inds = defaultdict(dict)
+    for category in categories:
+        lbls = set(nodes[category].to_list())
+        for lbl in lbls:
+            g_inds[category][lbl] = nodes.loc[nodes[category] == lbl].idx.to_list()
     sames = defaultdict(list)
     diffs = defaultdict(list)
     sizes = list()
@@ -293,8 +307,9 @@ def plot_closeness_for_category(**kwargs):
         except KeyError:
             pass
         diffs[res['c']].append(res['df'])
+        data.append(res)
         if count % 100 == 0:
-            print(res)
+            print('\n'+str(res)+'\n')
             sys.stdout.flush()
             with open(fname, 'a') as f:
                 f.write(json.dumps(data)+'\n')
@@ -307,18 +322,21 @@ def plot_closeness_for_category(**kwargs):
 
     data = dict()
     for category in diffs:
-        fig, (ax) = plt.subplots(1,1)
+        fig, (ax) = plt.subplots(1,1, figsize=(4,4))
         styles = itertools.cycle(['-', '--', '-.', ':'])
         ecdf = ECDF(diffs[category])
         lines = list()
         xd, yd = list(ecdf.x), list(ecdf.y)
-        lines += ax.plot(xd,yd, next(styles), label='same')
+        lines += ax.plot(xd,yd, next(styles), label='diff')
         ecdf = ECDF(sames[category])
         xs, ys = list(ecdf.x), list(ecdf.y)
-        lines += ax.plot(xs,ys, next(styles), label='diff')
+        lines += ax.plot(xs,ys, next(styles), label='same')
         m = np.percentile(diffs[category], 95)
         ax.axvline(m, color='r', linewidth=0.7)
+        ax.annotate("{:.2f}".format(m), (m, 0.8), textcoords="offset points", ha='center', fontsize=16, backgroundcolor='white')
         ax.legend(lines, [z.get_label() for z in lines])
+        ax.set_xlim([0, 1.0])
+        ax.set_ylim([0, 1.0])
         ax.set_xlabel('median CRNE')
         ax.set_ylabel('CDF')
         fig.savefig(scb.fmt_path('plotsdir/closeness_vs_category/'+category+'.png'))
@@ -337,14 +355,52 @@ def plot_closeness_for_category(**kwargs):
         json.dump({'means': x, 'sizes': y, 'stds': stds}, f)
 
 
+def plot_cnre_country_map():
+    D = DataGetter()
+    conversions = dict()
+    with open(D.fmt_path('datadir/countries_codes.csv'), 'r') as f:
+        for line in f:
+            pieces = [z.replace('"','') for z in line.split('",')]
+            conversions[pieces[1].strip()] = (pieces[0].strip(), pieces[2].strip())
+    data = list()
+    with open(D.fmt_path('datadir/closeness_vs_category/data.json'), 'r') as f:
+        for line in f:
+            d = json.loads(line)
+            data += [z for z in d if z['c'] == 'country']
+    world = gp.read_file(gp.datasets.get_path('naturalearth_lowres'))
+    world = world[(world.pop_est>0) & (world.name!="Antarctica")]
+    names = {n: i for i,n in enumerate(world.name.tolist())}
+    isos = {n: i for i,n in enumerate(world.iso_a3.tolist())}
+    weights = [0.2]*len(names)
+    for item in data:
+        try:
+            name, iso  = conversions[item['l']]
+        except:
+            continue
+        try:
+            if name in names:
+                weights[names[name]] = item['df']
+            elif iso in isos:
+                weights[isos[iso]] = item['df']
+        except KeyError:
+            continue
+    world['cnre'] = weights
+    ax = world.plot(column='cnre', cmap='Blues', figsize=(16, 15),
+            edgecolor='black', legend_kwds={'prop': {'size': 5}}, )
+    fig = ax.get_figure()
+    fig.savefig(D.fmt_path('plotsdir/cnre_country_uniqueness_map.png'))
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     '''
     make_homogeneity_and_completeness()
     make_homogeneity_and_completeness_for_resolvers()
+    '''
     plot_homogeneity_and_completeness('country')
     plot_homogeneity_and_completeness('ip24')
     plot_homogeneity_and_completeness('prefix')
     plot_homogeneity_and_completeness('asn')
     plot_homogeneity_and_completeness('resolvers')
-    '''
-    plot_closeness_for_category()
+    #plot_closeness_for_category()
+    #plot_cnre_country_map()
