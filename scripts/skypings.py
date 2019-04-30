@@ -28,11 +28,14 @@ class Pings(ExperimentData):
     def get_flat_pings(self, *args, **kwargs):
         pings = self.get_pings(*args, **kwargs)
         ret = list()
-        [ret.extend(res) for res in pings['res']]
+        [ret.append(np.mean(res)) for res in pings['res']]
         return ret
 
     def get_ping_stats(self, *args, **kwargs):
         pings = self.get_flat_pings(*args, **kwargs)
+        if not pings:
+            return ()
+        '''
         q2 = np.percentile(pings, 25)
         q4 = np.percentile(pings, 75)
         iqr = q4 - q2
@@ -44,5 +47,11 @@ class Pings(ExperimentData):
                 'high_outlier': high_outlier,
                 'low_outlier': low_outlier,
                 '25': q2,
-                '75': q4
+                '75': q4,
+                'count': len(pings)
                 }
+        '''
+        return (np.mean(pings),
+                np.std(pings),
+                len(pings)
+                )

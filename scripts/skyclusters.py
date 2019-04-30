@@ -310,7 +310,7 @@ class SkyClusterBuilder(ExperimentData):
     def get_pair_closeness(self, i, j):
         return self.matrix[self.get_matrix_index(i, j)]
 
-    def crne(self, i, j):
+    def cnre(self, i, j):
         A = self.nodes.posmap[i]
         B = self.nodes.posmap[j]
         return self.matrix[self.get_matrix_index(A, B)]

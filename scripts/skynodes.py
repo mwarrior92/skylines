@@ -81,7 +81,7 @@ class Nodes(ExperimentData):
 
     def load_pings(self):
         p = skypings.Pings()
-        self._probes_df = self._probes_df.assign(resolvers=[list(p.get_ping_stats(z)) for z \
+        self._probes_df = self._probes_df.assign(pings=[p.get_ping_stats(z) for z \
                 in self._probes_df.probe])
 
     def keep_only(self, fields):

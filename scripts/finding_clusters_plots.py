@@ -35,16 +35,16 @@ def cycle_worker(q):
         del arg
 
 
-def get_geo_vs_crne(i):
+def get_geo_vs_cnre(i):
     a, b = skyclusters.get_pair_indices(i, len(g_scb.nodes))
     A = g_scb.nodes[a]
     B = g_scb.nodes[b]
-    crne = g_scb.matrix[i]
+    cnre = g_scb.matrix[i]
     comp = NodeComparison(A, B, g_scb.counts)
-    return [crne, comp.geo_distance]
+    return [cnre, comp.geo_distance]
 
 
-def get_ping_vs_crne(i):
+def get_ping_vs_cnre(i):
     a, b = skyclusters.get_pair_indices(i, len(g_scb.nodes))
     x = g_means[a]
     y = g_means[b]
@@ -52,11 +52,11 @@ def get_ping_vs_crne(i):
         tmp = y
         y = x
         x = tmp
-    crne = g_scb.matrix[i]
-    return [crne, x/y]
+    cnre = g_scb.matrix[i]
+    return [cnre, x/y]
 
 
-def make_geo_vs_crne(workers=2, chunksize=500):
+def make_geo_vs_cnre(workers=2, chunksize=500):
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder(limit=500)
     g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
@@ -69,31 +69,31 @@ def make_geo_vs_crne(workers=2, chunksize=500):
     dumper = Process(target=cycle_worker, args=(q,))
     dumper.start()
     data = list()
-    for res in pool.imap_unordered(get_geo_vs_crne, range(len(g_scb.matrix)), chunksize):
+    for res in pool.imap_unordered(get_geo_vs_cnre, range(len(g_scb.matrix)), chunksize):
         data.append(res)
         if len(data) >= 10000:
-            q.put((dump_geo_vs_crne, data))
+            q.put((dump_geo_vs_cnre, data))
             del data
             data = list()
     if len(data) > 0:
-        q.put((dump_geo_vs_crne, data))
+        q.put((dump_geo_vs_cnre, data))
     q.put(('exit', True))
     dumper.join()
 
 
-def dump_pings_vs_crne(data):
+def dump_pings_vs_cnre(data):
     D = DataGetter()
-    with open(D.fmt_path('datadir/vs_crne/pings'), 'a') as f:
+    with open(D.fmt_path('datadir/vs_cnre/pings'), 'a') as f:
         for res in data:
             f.write(json.dumps(res)+'\n')
 
-def dump_geo_vs_crne(data):
+def dump_geo_vs_cnre(data):
     D = DataGetter()
-    with open(D.fmt_path('datadir/vs_crne/geodists'), 'a') as f:
+    with open(D.fmt_path('datadir/vs_cnre/geodists'), 'a') as f:
         for res in data:
             f.write(json.dumps(res)+'\n')
 
-def make_pings_vs_crne(workers=2, chunksize=500):
+def make_pings_vs_cnre(workers=2, chunksize=500):
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder(limit=500)
     g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
@@ -119,14 +119,14 @@ def make_pings_vs_crne(workers=2, chunksize=500):
     dumper = Process(target=cycle_worker, args=(q,))
     dumper.start()
     data = list()
-    for res in pool.imap_unordered(get_ping_vs_crne, range(len(g_scb.nodes)), chunksize):
+    for res in pool.imap_unordered(get_ping_vs_cnre, range(len(g_scb.nodes)), chunksize):
         data.append(res)
         if len(data) >= 10000:
-            q.put((dump_pings_vs_crne, data))
+            q.put((dump_pings_vs_cnre, data))
             del data
             data = list()
     if len(data) > 0:
-        q.put((dump_pings_vs_crne, data))
+        q.put((dump_pings_vs_cnre, data))
     q.put(('exit', True))
     dumper.join()
 
@@ -256,23 +256,23 @@ def get_same_diff_for_pair((category, label)):
     sys.stdout.write(str(label)+', ')
     sys.stdout.flush()
     indices = nodes.loc[nodes[category] == label].idx.to_list()
-    crnes = list()
+    cnres = list()
     data = {'l': label, 'c': category, 'sz': len(indices)}
     if len(indices) > 1:
         for a,b in itertools.combinations(indices, 2):
-            crnes.append(1.0-scb.crne(a,b))
-        data['sm'] = np.median(crnes)
-        data['smn'] = np.mean(crnes)
-        data['std'] = np.std(crnes)
-    mcrnes = list()
+            cnres.append(1.0-scb.cnre(a,b))
+        data['sm'] = np.median(cnres)
+        data['smn'] = np.mean(cnres)
+        data['std'] = np.std(cnres)
+    mcnres = list()
     for lbl in g_inds[category]:
         if lbl == label:
             continue
-        crnes = list()
+        cnres = list()
         for a,b in itertools.product(indices, g_inds[category][lbl]):
-            crnes.append(1.0-scb.crne(a,b))
-        mcrnes.append(np.median(crnes))
-    data['df'] = np.median(mcrnes)
+            cnres.append(1.0-scb.cnre(a,b))
+        mcnres.append(np.median(cnres))
+    data['df'] = np.median(mcnres)
     return data
 
 
@@ -338,7 +338,7 @@ def plot_closeness_for_category(**kwargs):
         ax.legend(lines, [z.get_label() for z in lines])
         ax.set_xlim([0, 1.0])
         ax.set_ylim([0, 1.0])
-        ax.set_xlabel('median CRNE')
+        ax.set_xlabel('median cnre')
         ax.set_ylabel('CDF')
         fig.savefig(scb.fmt_path('plotsdir/closeness_vs_category/'+category+'.png'))
         plt.close(fig)
@@ -347,7 +347,7 @@ def plot_closeness_for_category(**kwargs):
     fig3, (ax3) = plt.subplots(1,1)
     _, x, y, stds = zip(*sizes)
     scatter = ax3.scatter(x, y, c=stds, edgecolors='k')
-    ax3.set_xlabel('mean CRNE')
+    ax3.set_xlabel('mean cnre')
     ax3.set_ylabel('label group size')
     plt.colorbar(scatter, ticks=np.arange(0.0, 1.01, 0.2))
     fig3.savefig(scb.fmt_path('plotsdir/closeness_vs_category/size.png'))
