@@ -136,7 +136,7 @@ class ClusterAnalysis(ExperimentData):
 
     def get_inner_cnres(self, cluster):
         cnres = defaultdict(list)
-        for i, j in itertools.combinations(cluster):
+        for i, j in itertools.combinations(cluster, 2):
             cnre = self.scb.cnre(i,j)
             cnres[i].append(cnre)
             cnres[j].append(cnre)
@@ -146,41 +146,47 @@ class ClusterAnalysis(ExperimentData):
 
     def get_inner_geo(self, cluster):
         dists = defaultdict(list)
-        nodes = [(z,self.scb.nodes[z].coords) for z in cluster]
+        nodes = list()
+        for z in cluster:
+            coords = self.scb.nodes[z].coords
+            if not coords or not coords[0]:
+                continue
+            else:
+                coords = coords[0][1], coords[0][0]
+            nodes.append((z,coords))
         nodes = [(z[0],z[1][0]) for z in nodes if z[1]]
-        for (i,a),(j,b) in itertools.combinations(nodes):
+        for (i,a),(j,b) in itertools.combinations(nodes, 2):
             d = vincenty(a, b).km
             dists[i].append(d)
             dists[j].append(d)
         for i in dists:
             dists[i] = np.mean(dists[i])
-        return dists
+        return dict(dists)
 
     def get_inner_performance(self, cluster):
         nodes = [(z,self.scb.nodes[z].pings) for z in cluster]
-        nodes = [(z[0],z[1][0], z[1][2]) for z in nodes if z[1]]
+        nodes = {z[0]:(z[1][0], z[1][2]) for z in nodes if z[1]}
         return nodes
 
-    def get_performance_dfm(self, inner):
-        # dfm = distance from mean
-        counts = [z[2] for z in inner]
+    def get_performance_mean(self, inner):
+        counts = [inner[z][1] for z in inner]
         typical = np.mean(counts)
         std = np.std(counts)
         nodes = list()
-        for i,p,c in inner:
+        for i in inner:
+            p,c = inner[i]
             if float(c) >= typical-std:
                 nodes.append((i, p))
         mean = np.mean([z[1] for z in nodes])
-        return (mean, [(z[0], z[1] - mean) for z in nodes])
+        return mean
 
-    def get_geo_dfm(self, inner):
-        # dfm = distance from mean
+    def get_geo_mean(self, inner):
         mean = np.mean(list(inner.values()))
-        return (mean, [(z,inner[z]-mean) for z in inner])
+        return mean
 
-    def get_cnre_dfm(self, inner):
+    def get_cnre_mean(self, inner):
         mean = np.mean(list(inner.values()))
-        return (mean, [(z,inner[z]-mean) for z in inner])
+        return mean
 
     def get_domain_alignment(self,cluster):
         '''
