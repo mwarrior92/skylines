@@ -26,8 +26,7 @@ def get_geo_vs_perf(i):
     '''
     try:
         cluster = g_clusters[i]
-        geo = g_ca.get_inner_geo(cluster)
-        mean_geo = g_ca.get_geo_mean(geo)
+        geocenter, geocenterloc, geo = g_ca.get_dists_from_geo_center(cluster)
         perf = g_ca.get_inner_performance(cluster)
         mean_perf = g_ca.get_performance_mean(perf)
         out_data = list()
@@ -40,7 +39,8 @@ def get_geo_vs_perf(i):
     except:
         traceback.print_exception(*sys.exc_info())
         raise Exception()
-    return {'raw_data': out_data, 'mean_geo': mean_geo, 'mean_perf': mean_perf}
+    return {'raw_data': out_data, 'geo_center': geocenter, 'geo_center_loc': geocenterloc,
+            'mean_perf': mean_perf}
 
 
 def plot_geo_distribution(workers=2):
@@ -68,17 +68,21 @@ def plot_perf_vs_geo(workers=2):
     data = list()
     for res in pool.imap_unordered(get_geo_vs_perf, range(len(g_clusters))):
         data.append(res)
-    with open(g_ca.fmt_path('datadir/geo_vs_perf/raw.json'), 'w') as f:
-        json.dump(data,f)
     x = list()
     y = list()
+    with open(g_ca.fmt_path('datadir/geo_vs_perf/raw.json'), 'w') as f:
+        json.dump(data,f)
     for item in data:
         _, geo, perf = zip(*item['raw_data'])
         x += geo
         y += perf
     x, y = zip(*sorted(zip(x,y), key=lambda z: z[0]))
+    slope, offset = np.polyfit(x,y,1)
+    with open(g_ca.fmt_path('datadir/geo_vs_perf/plot.json'), 'w') as f:
+        json.dump({'x': x, 'y': y, 'slope': slope, 'offset': offset},f)
     fig, ax = plt.subplots(figsize=(6,3.5))
-    ax.plot(x,y)
+    ax.scatter(x,y)
+    ax.plot(x, [offset + slope*z for z in x])
     ax.set_xlabel('mean distance (km)')
     ax.set_ylabel('mean ping (ms)')
     fig.savefig(g_ca.fmt_path('plotsdir/geo_vs_perf/raw.png'))

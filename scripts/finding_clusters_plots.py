@@ -241,7 +241,7 @@ def plot_homogeneity_and_completeness(category):
     ax2.axhline(len(labelset), color='k')
     #vind, _ = min([(i,abs(n-len(labelset))) for i,n in enumerate(y3)], key=lambda z: z[1])
     #ax.axvline(x[vind], color='green')
-    ax.axvline(0.73, color='green')
+    ax.axvline(1.0-0.73, color='green')
     lines = l1+l2+l3
     ax2.set_yscale('log')
     ax.set_xlabel('distance threshold')

@@ -1,4 +1,5 @@
 from skyclusters import SkyClusterBuilder
+from skycompare import NodeComparison
 from experimentdata import ExperimentData, DataGetter
 import scipy.cluster.hierarchy as  hierarchy
 import json
@@ -126,7 +127,18 @@ class ClusterAnalysis(ExperimentData):
                 uniques.append((addr, coverage, answers[site][addr]))
         return uniques
 
-    def merge_answers(self, cluster):
+    def compare_mergeables(self, cluster, mergeables):
+        listpings = self.scb.nodes.to_ping(cluster)
+        pings = defaultdict(lambda: defaultdict(list))
+        for i, client in enumerate(listpings):
+            res = self.scb.nodes[cluster[i]].results
+            for site in client:
+                pings[site][res[site]].append(client[site])
+        comps = dict()
+        for site in mergeables:
+            if site in pings:
+                comps[site] = list()
+    def merge_answers(self, cluster, mergeables):
         '''
         TODO: this should also make a new corresponding pkl
             TODO: if we make a new pkl, will need a simple way to know which pkl to use based on
@@ -183,6 +195,33 @@ class ClusterAnalysis(ExperimentData):
     def get_geo_mean(self, inner):
         mean = np.mean(list(inner.values()))
         return mean
+
+    def get_geo_center(self, inner):
+        mean = np.mean(list(inner.values()))
+        center = sorted(list(inner.keys()), key=lambda z: abs(inner[z]-mean))[0]
+        return self.scb.nodes[center]
+
+    def get_dists_from_geo_center(self, cluster):
+        dists = defaultdict(list)
+        nodes = list()
+        for z in cluster:
+            coords = self.scb.nodes[z].coords
+            if not coords or not coords[0]:
+                continue
+            else:
+                coords = coords[0][1], coords[0][0]
+            nodes.append((z,coords))
+        for (i,a),(j,b) in itertools.combinations(nodes, 2):
+            d = vincenty(a, b).km
+            dists[i].append(d)
+            dists[j].append(d)
+        for i in dists:
+            dists[i] = np.mean(dists[i])
+        mean = np.mean(list(dists.values()))
+        center = sorted(list(dists.keys()), key=lambda z: abs(dists[z]-mean))[0]
+        center_loc = self.scb.nodes[center].coords[0]
+        center_loc = [center_loc[1], center_loc[0]]
+        return (center, center_loc, {z[0]: vincenty(z[1], center_loc).km for z in nodes})
 
     def get_cnre_mean(self, inner):
         mean = np.mean(list(inner.values()))

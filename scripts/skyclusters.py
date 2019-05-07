@@ -253,8 +253,9 @@ class SkyClusterBuilder(ExperimentData):
         stds = [50.0*float(z)/float(max(stds)) for z in stds]
         fig, (ax) = plt.subplots(1, 1, figsize=(6, 6))
         ax.scatter(mean_errs, answers, stds, alpha=0.3)
-        ax.set_xlabel('mean closeness error')
-        ax.set_ylabel('# distinct answers')
+        ax.set_xlabel('mean domain error')
+        ax.set_ylabel('# distinct answers from domain')
+        ax.set_yscale('log')
         fig.savefig(self.fmt_path('plotsdir/domain_error/'+self.timeid+'.png'))
         plt.close(fig)
         print(self.fmt_path('plotsdir/domain_error/'+self.timeid+'.png'))
