@@ -354,6 +354,6 @@ if __name__ == "__main__":
         g_scb.matrix = g_matrix
         del tmpmatrix
     gc.collect()
-    g_scb.domain_error()
+    g_scb.domain_error(10)
     g_scb.condense_domain_error()
     g_scb.plot_domain_error()
