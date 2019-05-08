@@ -16,6 +16,7 @@ from statsmodels.distributions.empirical_distribution import ECDF
 from ctypes import c_double
 import os.path
 import gc
+import shutil
 
 
 def cycle_worker(q):
@@ -346,6 +347,10 @@ if __name__ == "__main__":
     '''
 
     ''' get domain error '''
+    try:
+        shutil.rmtree(g_scb.fmt_path('datadir/domain_error/'))
+    except:
+        pass
     with open(g_scb.fmt_path('datadir/matrix/matrix.json'), 'r') as f:
         tmpmatrix = json.load(f)
         g_matrix = RawArray('d', len(tmpmatrix))
