@@ -26,7 +26,11 @@ def get_geo_vs_perf(i):
     '''
     try:
         cluster = g_clusters[i]
-        geocenter, geocenterloc, geo = g_ca.get_dists_from_geo_center(cluster)
+        try:
+            geocenter, geocenterloc, geo = g_ca.get_dists_from_geo_center(cluster)
+        except:
+            print(cluster)
+            return {}
         perf = g_ca.get_inner_performance(cluster)
         mean_perf = g_ca.get_performance_mean(perf)
         out_data = list()
@@ -67,7 +71,8 @@ def plot_perf_vs_geo(workers=2):
     pool = Pool(workers)
     data = list()
     for res in pool.imap_unordered(get_geo_vs_perf, range(len(g_clusters))):
-        data.append(res)
+        if res:
+            data.append(res)
     x = list()
     y = list()
     with open(g_ca.fmt_path('datadir/geo_vs_perf/raw.json'), 'w') as f:
@@ -106,5 +111,5 @@ if __name__ == '__main__':
     global g_ca
     g_scb.nodes.load_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
-    g_clusters = g_ca.grouped_clusters(threshold=0.73)
+    g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
     plot_perf_vs_geo(2)

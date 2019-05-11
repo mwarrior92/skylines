@@ -26,10 +26,23 @@ from each other in terms of their \emph{common network resource exposure} (CNRE)
 terms highlights what should be a chief concern in large scale Internet measurement platforms and
 network optimization efforts: the sets of clients actually being directed the same resources.
 
-\begin{figure}
-    \epsfig{file=figs/country_cdf.png, width=1\linewidth}
-    \caption{Diagram illustration resource selection}
-\end{figure}
+\begin{figure*}
+    \center
+        \mbox{
+            \begin{subfigure}[b]{0.5\linewidth}
+                \epsfig{file=figs/dns_resolution.png, width=1\linewidth}
+                \caption{\label{fig:dns}}
+            \end{subfigure}
+            \begin{subfigure}[b]{0.5\linewidth}
+                \epsfig{file=figs/client_mapping.png, width=1\linewidth}
+                \caption{\label{fig:mismatch}}
+            \end{subfigure}
+        }
+    \caption{
+        Illustration of network resource resource allocation. Subfigure \ref{fig:dns} shows DNS resolution at a high level: 1) The client deploys a DNS query for example.com. 2) This query ultimately reaches nameserver responsible for example.com and decides which of example.com's network resources should serve the client. 3) The nameserver's resource selection is returned to the client. Subfigure \ref{fig:mismatch} shows an example of how clients with similarly described locations may
+        be directed to distinct network resources.
+    }
+\end{figure*}
 
 In order to develop the Skyline model, I performed an exhaustive set of measurements to frame
 client experience on a per \emph{site} basis. In my completed, preliminary work, I capture a

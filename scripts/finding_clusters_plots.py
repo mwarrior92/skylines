@@ -17,6 +17,27 @@ import time
 from matplotlib import cm
 from collections import defaultdict
 import geopandas as gp
+from descartes import PolygonPatch
+import matplotlib.colors as colors
+from matplotlib.ticker import ScalarFormatter, LogFormatter
+
+
+def plotCountryPatch( axes, country_name, fcolor, world):
+    # plot a country on the provided axes
+    nami = world[world.index == country_name]
+    namigm = nami.__geo_interface__['features']  # geopandas's geo_interface
+    namig0 = {'type': namigm[0]['geometry']['type'], \
+              'coordinates': namigm[0]['geometry']['coordinates']}
+    axes.add_patch(PolygonPatch( namig0, fc=fcolor, ec="gray", alpha=0.85, zorder=2 ))
+
+def plotCountryPatch2( axes, country_name, fcolor, world):
+    # plot a country on the provided axes
+    nami = world[world.name == country_name]
+    namigm = nami.__geo_interface__['features']  # geopandas's geo_interface
+    namig0 = {'type': namigm[0]['geometry']['type'], \
+              'coordinates': namigm[0]['geometry']['coordinates']}
+    axes.add_patch(PolygonPatch( namig0, fc=fcolor, ec="gray", alpha=0.85, zorder=2 ))
+
 
 def make_dendrogram():
     scb = skyclusters.SkyClusterBuilder(limit=500)
@@ -358,37 +379,54 @@ def plot_closeness_for_category(**kwargs):
 
 def plot_cnre_country_map():
     D = DataGetter()
+    world = gp.read_file(gp.datasets.get_path('naturalearth_lowres'))
+    world = world[(world.pop_est>0) & (world.name!="Antarctica")]
+    names = world.name.tolist()
+    pos = {names[i]: i for i in range(len(names))}
+    pos['United States'] = 4
+    pos['Iran, Islamic Republic of'] = 107
+    weights = defaultdict(set)
     conversions = dict()
     with open(D.fmt_path('datadir/countries_codes.csv'), 'r') as f:
         for line in f:
             pieces = [z.replace('"','') for z in line.split('",')]
-            conversions[pieces[1].strip()] = (pieces[0].strip(), pieces[2].strip())
+            try:
+                conversions[pieces[1].strip()] = pieces[0].strip()
+            except:
+                pass
     data = list()
     with open(D.fmt_path('datadir/closeness_vs_category/data.json'), 'r') as f:
         for line in f:
             d = json.loads(line)
             data += [z for z in d if z['c'] == 'country']
-    world = gp.read_file(gp.datasets.get_path('naturalearth_lowres'))
-    world = world[(world.pop_est>0) & (world.name!="Antarctica")]
-    names = {n: i for i,n in enumerate(world.name.tolist())}
-    isos = {n: i for i,n in enumerate(world.iso_a3.tolist())}
-    weights = [0.2]*len(names)
     for item in data:
-        try:
-            name, iso  = conversions[item['l']]
-        except:
-            continue
-        try:
-            if name in names:
-                weights[names[name]] = item['df']
-            elif iso in isos:
-                weights[isos[iso]] = item['df']
-        except KeyError:
-            continue
-    world['cnre'] = weights
-    ax = world.plot(column='cnre', cmap='Blues', figsize=(16, 15),
-            edgecolor='black', legend_kwds={'prop': {'size': 5}}, )
-    fig = ax.get_figure()
+        weights[item['l']] = item['df']
+    with open(D.fmt_path('datadir/country_cnre_distance_map.json'),'w') as f:
+        json.dump(weights, f)
+    vals = list()
+    covered = {pos[conversions[z]]:weights[z] for z in weights if z and z in conversions and conversions[z] in pos}
+    nones = list()
+    for i in range(len(names)):
+        if i in covered:
+            vals.append(covered[i])
+        else:
+            vals.append(min(covered.values()))
+            nones.append(i)
+    print(sorted(vals))
+    world['cnre'] = vals
+    fig, ax = plt.subplots(figsize=(6,4))
+    world.plot(column='cnre', cmap='cool', edgecolor='gray', ax=ax, norm=colors.Normalize(vmin=min(vals), vmax=max(vals)))
+    for name in nones:
+        if name > 158:
+            name += 1
+        plotCountryPatch(ax, name, 'white', world)
+    ax.set_xticks([],[])
+    ax.set_yticks([],[])
+    sm = plt.cm.ScalarMappable(cmap='cool', norm=colors.Normalize(vmin=min(vals), vmax=max(vals)))
+    sm._A = []
+    cax = fig.add_axes([0.08, 0.15, 0.82, 0.05])
+    cbar = fig.colorbar(sm, cax=cax, orientation='horizontal')
+    cax.set_xlabel('mean external CNRE')
     fig.savefig(D.fmt_path('plotsdir/cnre_country_uniqueness_map.png'))
     plt.close(fig)
 
@@ -397,11 +435,11 @@ if __name__ == '__main__':
     '''
     make_homogeneity_and_completeness()
     make_homogeneity_and_completeness_for_resolvers()
-    '''
     plot_homogeneity_and_completeness('country')
     plot_homogeneity_and_completeness('ip24')
     plot_homogeneity_and_completeness('prefix')
     plot_homogeneity_and_completeness('asn')
     plot_homogeneity_and_completeness('resolvers')
-    #plot_closeness_for_category()
-    #plot_cnre_country_map()
+    plot_closeness_for_category()
+    '''
+    plot_cnre_country_map()
