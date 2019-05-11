@@ -3,14 +3,18 @@ from collections import defaultdict
 import cPickle as pkl
 from experimentdata import ExperimentData
 
-def count_answers_across_nodes(nodes):
+def count_answers_across_nodes(nodes, fname='datadir/pkls/answer_counts.pkl'):
     count = defaultdict(lambda: 0.0)
     for i in range(len(nodes)):
         for key in nodes[i].results.iteritems():
             count[key] += 1.0
             count[key[0]] += 1.0
     print('getting count answers')
+    '''
     with open(nodes.fmt_path('datadir/pkls/answer_counts.pkl'), 'w') as f:
+        pkl.dump(dict(count), f)
+    '''
+    with open(nodes.fmt_path(fname), 'w') as f:
         pkl.dump(dict(count), f)
     return count
 
@@ -55,6 +59,11 @@ class NodeComparison(ExperimentData):
             self._shared_domains = set(self.a.results.keys()).intersection(self.b.results.keys())
         return self._shared_domains
 
+    def reached_cap(self, val):
+        if hasattr(self, 'compcap') and val > self.compcap:
+            return True
+        return False
+
     @property
     def closeness(self):
         '''
@@ -65,7 +74,9 @@ class NodeComparison(ExperimentData):
             return self._closeness
         n = 0
         d = 0
-        for dom in self.shared_domains:
+        for domcount, dom in enumerate(self.shared_domains):
+            if self.reached_cap(domcount):
+                break
             aRes = self.a.results[dom]
             bRes = self.b.results[dom]
             ans_weight = float(sum([self.counts[(dom, z)] for xRes in [aRes, bRes] for z in xRes]))

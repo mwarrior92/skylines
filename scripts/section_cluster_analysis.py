@@ -16,8 +16,12 @@ from statsmodels.distributions.empirical_distribution import ECDF
 import time
 from matplotlib import cm
 from collections import defaultdict
-from multiprocessing import Pool
 import traceback
+import geopandas as gp
+from descartes import PolygonPatch
+import matplotlib.colors as colors
+from matplotlib.ticker import ScalarFormatter, LogFormatter
+from shapely.geometry import Point, Polygon
 
 
 def get_geo_vs_perf(i):
@@ -87,11 +91,26 @@ def plot_perf_vs_geo(workers=2):
         json.dump({'x': x, 'y': y, 'slope': slope, 'offset': offset},f)
     fig, ax = plt.subplots(figsize=(6,3.5))
     ax.scatter(x,y)
-    ax.plot(x, [offset + slope*z for z in x])
+    ax.plot(x, [offset + slope*z for z in x], 'r')
     ax.set_xlabel('mean distance (km)')
     ax.set_ylabel('mean ping (ms)')
     fig.savefig(g_ca.fmt_path('plotsdir/geo_vs_perf/raw.png'))
     plt.close(fig)
+
+
+def plot_geo_centers():
+    D = DataGetter()
+    world = gp.read_file(gp.datasets.get_path('naturalearth_lowres'))
+    world = world[(world.pop_est>0) & (world.name!="Antarctica")]
+    with open(D.fmt_path('datadir/geo_vs_perf/raw.json'), 'r') as f:
+        geometry, sizes = zip(*[(Point(z['geo_center_loc'][1],z['geo_center_loc'][0]), len(z['raw_data'])) for z in json.load(f)])
+    fig, ax = plt.subplots(figsize=(15,15))
+    world.plot(edgecolor='gray', ax=ax)
+    gdf = gp.GeoDataFrame(geometry=list(geometry))
+    gdf.plot(ax=ax, markersize=5, color='yellow')
+    fig.savefig(D.fmt_path('plotsdir/geo_centers.png'))
+    plt.close(fig)
+
 
 
 def plot_perfdfm_vs_cnredfm():
@@ -112,4 +131,7 @@ if __name__ == '__main__':
     g_scb.nodes.load_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
     g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
-    plot_perf_vs_geo(2)
+    #plot_perf_vs_geo(2)
+    plot_geo_centers()
+    with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
+        f.write(str(len(g_clusters)))

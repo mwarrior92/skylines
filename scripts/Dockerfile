@@ -16,5 +16,6 @@ RUN echo "backend : Agg" > /root/.config/matplotlib/matplotlibrc
 RUN pip install -U scikit-learn
 RUN pip install geopandas
 RUN pip install descartes
+RUN pip install shapely
 CMD [ "python", "section_cluster_analysis.py" ]
 

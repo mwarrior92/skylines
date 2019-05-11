@@ -1,18 +1,25 @@
 \begin{abstract}
 
-    Existing mapping systems and measures used to describe Internet location
-    fail to account for complexities introduced by DNS-based content
-    allocation schemes. With DNS redirection, in particular, clients residing in
-    the exact same network location may potentially be served by completely
-    different content sources. Likewise, distant clients may be directed to the
-    same servers. The existence of such scenarios challenges the validy of
-    some common assumptions about network behavior: the relationship between a
-    client's network location and its ``view'' of the Internet, independent of
-    performance, is neither predictable nor consistent across clients. 
+``Do you see what I see?'' The vastness of today's Internet creates an intuitive
+but often overlooked phenomenon: not everyone is exposed to the same web
+resources. Even across the set of objects embedded in a single web page, a pair of
+clients with apparently similar network properties may assigned to barely
+overlapping sets of network resources to pull from. While the properties of
+individual content distribution networks (CDNs) and the like are well explored,
+there has been, until now, a lack of insight regarding the \emph{aggregate}
+behavior of these many large networks co-existing.  
 
-    In this paper, we introduce skylines, a distance measure that describes
-    variation in Internet resource allocation between clients. TODO: finish list
-    of contributions
+In this paper, we perform the first, deep analysis of cross-provider resource
+allocation patterns and the resulting aggregate mapping of over 10,000 RIPE
+Atlas clients around the world. To facilitate our research, we introduce common
+network resource exposure (CNRE) - a measure of the degree to which a pair of
+clients are exposed to the same network destinations as each other across a
+large set of domains. We explore the implications of high and low CNRE scores,
+and assess the applicability of well established network properties (country,
+ASN, BGP prefix, and /24) in estimating CNRE. Our findings expose clients that
+are poorly served by their current position in this aggregate mapping scheme and
+highlight the existence of ``outlier'' CDNs, who allocate their resources in a
+way that goes against broader Internet trends.
 
 \end{abstract}
 

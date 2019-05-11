@@ -179,6 +179,36 @@ class SkyClusterBuilder(ExperimentData):
         with open(path, 'w') as f:
             json.dump(self.matrix, f)
 
+    def make_closeness_matrix_capped(self, compcap, workers=None):
+        print('calculating closeness matrix')
+        self.matrix = list()
+        a = time.time()
+        self.kwargs['compcap'] = compcap
+        self.kwargs['counts'] = count_answers_across_nodes(self.nodes, 'datadir/pkls2/tmp_answer_counts.pkl')
+        itr = itertools.combinations(range(len(self.nodes)), 2)
+        itr = itertools.imap(lambda z: (self.nodes[z[0]], self.nodes[z[1]],
+            self.kwargs), itr)
+
+        pool = Pool(processes=workers)
+        count = 0
+        for c in pool.imap(get_closeness, itr, self.chunksize):
+            self.matrix.append(c)
+            if not count % 1000:
+                print('comparison: '+str(count)+', result: '+str(self.matrix[-1]))
+            count += 1
+        self.duration = time.time()-a
+        print('duraiton: '+str(self.duration)+', chunk: '+str(self.chunksize))
+        print('done calculating matrix')
+        self.linkage = linkage(self.matrix, method='complete')
+        self.cophenet = cophenet(self.linkage, self.matrix)[0]
+        self.save_self()
+        path = self.fmt_path('objectdir/linkage/'+self.timeid+'.json')
+        with open(path, 'w') as f:
+            json.dump(self.linkage.tolist(), f)
+        path = self.fmt_path('objectdir/matrix/'+self.timeid+'.json')
+        with open(path, 'w') as f:
+            json.dump(self.matrix, f)
+
     def domain_error(self, workers=3):
         print('comparing closeness to each domain')
         combos = itertools.combinations(range(len(self.nodes)), 2)
@@ -338,7 +368,6 @@ class SkyClusterBuilder(ExperimentData):
 
 if __name__ == "__main__":
 
-    g_scb = SkyClusterBuilder(limit=500)
 
     ''' get matrix and make dendrogram
     with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
@@ -346,7 +375,7 @@ if __name__ == "__main__":
     #print(b.make_dendrogram(no_labels=True, truncate_mode='lastp', p=50)[0])
     '''
 
-    ''' get domain error '''
+    ''' get domain error
     try:
         shutil.rmtree(g_scb.fmt_path('datadir/domain_error/'))
     except:
@@ -362,3 +391,19 @@ if __name__ == "__main__":
     g_scb.domain_error(10)
     g_scb.condense_domain_error()
     g_scb.plot_domain_error()
+    '''
+    ''' get matrix and make dendrogram
+    '''
+    g_stats = list()
+    for cap in np.arange(10,301,step,int):
+        g_scb = SkyClusterBuilder(limit=500)
+        g_scb.make_closeness_matrix_capped(cap)
+        g_stats.append({
+            'cap': cap,
+            '90': np.percentile(g_scb.matrix, 90),
+            'median': np.median(g_scb.matrix),
+            '10': np.percentile(g_scb.matrix, 10)
+            })
+    with open(g_scb.fmt_path('datadir/per_additional_domain.json'),'w') as f:
+        json.dump(g_stats, f)
+
