@@ -97,4 +97,25 @@ growth patterns, beginning to plateau well before 100 domains are reached. We
 assert that this demonstrates the aggregate behavior of the 304 domains obtained above
 should sufficiently cover the domain diversity of a ``typical'' popular web page. 
 
+\subsection{Per-Provider Performance Measurement}
 
+Any attempt to identify the general groups that Internet clients are mapped to
+requires a dataset with a uniquely broad scope: not only breadth --- a diverse
+set of clients --- but also depth --- many clients from each, yet to be
+uncovered, group or cluster. In addition, we are required to minimize the
+temporal spread of the measurements, as network resource allocation is known to
+change over time. We utilize the RIPE Atlas platform CITE for our measurements.
+RIPE Atlas offers a large number of globally distributed clients, capable of
+performing lightweight network measurements, such as pings, on behalf of
+configurable requests received by the Atlas API. We deployed ping measurements
+to the previously described 304 domains from 10,274 of RIPE's clients. Each
+client performed DNS resolution for pings via their local DNS resolver, ensuring
+that they each targeted the web resource they would ordinarily be directed to.
+
+Unavoiable flux in the availability of individual, voluntarily maintained
+clients lead to some clients to performinging only a subset of the given
+measurements, thus missing some of the domains of interest. To be sure that this
+does not dramatically affect our findings, we arbitrarily enforce minimal amount
+of domain coverage --- 160 domains, just more than half of our set --- for use
+of a given client's data. We show in Section REF the effects of domain quantity
+in our measurements.

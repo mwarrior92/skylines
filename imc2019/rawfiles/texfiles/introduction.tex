@@ -16,9 +16,9 @@ domain names, just as humans cannot be expected to remember the plethora IP addr
 every day. While it is intuitive that no labeling system is applicable across all possible
 dimensions, in practice, this fact is often taken for granted or neglected entirely.
 
-In this project, I challenge the careless application of conventional client labeling schemes in
+In this project, we challenge the careless application of conventional client labeling schemes in
 Internet measurement experiments, particulary those subject to the effects of DNS redirection and
-CDN PoP (point of presence) catchment formation. I uncover and quantify the degree of misalignment
+CDN PoP (point of presence) catchment formation. we uncover and quantify the degree of misalignment
 between experimentally determined aggregate catchments and labels often assumed to indicate
 ``similarity" between clients --- country, AS number, announced BGP prefix, and /24 subnet --- and
 use this to design the Skyline model, a grouping system which describes clients' relative distances
@@ -44,25 +44,25 @@ network optimization efforts: the sets of clients actually being directed the sa
     }
 \end{figure*}
 
-In order to develop the Skyline model, I performed an exhaustive set of measurements to frame
-client experience on a per \emph{site} basis. In my completed, preliminary work, I capture a
+In order to develop the Skyline model, we performed an exhaustive set of measurements to frame
+client experience on a per \emph{site} basis. In our completed, preliminary work, we capture a
 snapshot of both DNS resolutions and latency measurements toward the 304 domains that appeared most
-frequently in the top 2441 most popular webpages. My measurements span over 10,000 unique
-clients spread across 185 countries and 3637 autonomous systems. I performed over 52 million pairwise
-comparisons with the results of these measurements to arrive at the foundation of what I have
+frequently in the top 2441 most popular webpages. Our measurements span over 10,000 unique
+clients spread across 185 countries and 3637 autonomous systems. we performed over 52 million pairwise
+comparisons with the results of these measurements to arrive at the foundation of what we have
 coined the ``Skyline model". 
 
-With this project, I make the following contributions, including those I expect to stem from
-proposed work, which I have designated with (\emph{p})
+With this project, we make the following contributions, including those we expect to stem from
+proposed work, which we have designated with (\emph{p})
 
 \begin{itemize}\parskip0pt \parsep0pt
-    \item I perform a large exploration of client network performance on a per webpage level. My
+    \item we perform a large exploration of client network performance on a per webpage level. Our
         raw results are publically available on the RIPE Atlas platform.
-    \item (\emph{p}) I quantify the degree of misalignment between conventional grouping schemes
+    \item (\emph{p}) we quantify the degree of misalignment between conventional grouping schemes
         and aggregate catchments.
-    \item (\emph{p}) I introduce the Skyline model, a client grouping scheme that reflects the
+    \item (\emph{p}) we introduce the Skyline model, a client grouping scheme that reflects the
         extent of CNRE.
-    \item (\emph{p}) Using the Skyline model, I identify and analyze network resource islands --- 
+    \item (\emph{p}) Using the Skyline model, we identify and analyze network resource islands --- 
         sets of clients with very high degrees CNRE. 
 \end{itemize}
 
@@ -85,16 +85,16 @@ applications may include, but are not limited to, distributed denial of service 
 
 The most similar body of related work involves anycast CDN catchment analysis, which aims to
 investigate the set of clients routed towards particular CDN points of presence (PoPs)
-\cite{Calder2015, anycastvsddos, vdmscatchment}. My work differs significantly in scope: to my
-knowledge, I am the first investigate what I refer to as \emph{aggregate catchments}, the joint
+\cite{Calder2015, anycastvsddos, vdmscatchment}. Our work differs significantly in scope: to our 
+knowledge, we are the first investigate what we refer to as \emph{aggregate catchments}, the joint
 behavior of many anycast CDN catchments and unicast CDN targets, spread across many content
 distribution platforms. Conversely, this related body work either focuses on individual platforms or
 specific services \cite{Calder2015, anycastvsddos, vdmscatchment}. 
 
 Several authors have attempted to discover the topology of large CDN platforms through large scale
 measurement studies \cite{webcart, Calder2013, benson11}. While their findings are potentially of
-use in this project, their goals and contributions run parallel to what I aim to accomplish. They
-seek to identify the properties and locations of CDN resources; conversely, I seek to identify the
+use in this project, their goals and contributions run parallel to what we aim to accomplish. They
+seek to identify the properties and locations of CDN resources; conversely, we seek to identify the
 target pools (sets of clients) of overlapping CDN resource catchments \cite{webcart, Calder2013,
 benson11}. Other work close to this space investigates the performance of a particular CDN
 deployment scheme \cite{ecs15sigcomm}.
