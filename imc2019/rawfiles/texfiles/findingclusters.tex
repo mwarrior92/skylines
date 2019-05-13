@@ -1,3 +1,9 @@
+
+\begin{figure*}
+    \epsfig{file=figs/dendrograms/v0.png, width=1\linewidth}
+    \caption{Dendrogram of CNRE distance across all client pairs}
+\end{figure*}
+
 \section{Finding Clusters} \label{sect:finding}
 
 Finding aggregate catchments --- pools of clients essentially directed toward
@@ -9,17 +15,12 @@ across all cluster members as opposed to potentially edge-specific properties.
 Note that in all \emph{clustering} calculations, we opt to use the CNRE \emph{distance}
 as defined in Section \ref{sect:cnre}.
 
-Establishing heirchical clusters requires that we have some definition of what
+Establishing hierarchical clusters requires that we have some definition of what
 constitutes a \emph{high} or \emph{low} CNRE measure and at what threshold it is
 appropriate to consider clients sufficiently similar such that they appear in
 the same cluster. In this section, we explore the implications of various CNRE
 values, as well as CNRE's relationship with other, well-established client grouping
 systems: country, ASN, BGP prefix, and /24 prefix subnet.
-
-\begin{figure*}
-    \epsfig{file=figs/dendrograms/v0.png, width=1\linewidth}
-    \caption{Dendrogram of CNRE distance across all client pairs}
-\end{figure*}
 
 
 \begin{figure*}
