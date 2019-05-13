@@ -21,7 +21,7 @@ def count_answers_across_nodes(nodes, fname='datadir/pkls/answer_counts.pkl'):
     '''
     with open(nodes.fmt_path(fname), 'w') as f:
         pkl.dump(dict(count), f)
-    return count
+    return dict(count)
 
 class NodeComparison(ExperimentData):
     def __init__(self, a, b, counts={}, **kwargs):
