@@ -395,7 +395,7 @@ if __name__ == "__main__":
     ''' get matrix and make dendrogram
     '''
     g_stats = list()
-    for cap in np.arange(10,301,step,int):
+    for cap in np.arange(10,301,10):
         g_scb = SkyClusterBuilder(limit=500)
         g_scb.make_closeness_matrix_capped(cap)
         g_stats.append({
