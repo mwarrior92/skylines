@@ -16,7 +16,6 @@ $r_{1_i}$ and $r_{2_i}$ represent the fraction of all measurements (across the
 entire dataset) that matched $C_1$'s and $C_2$'s DNS answer for that domain,
 respectively. For example, if $C_1$'s answer for domain $i$ appeared 900 times
 across the 9024 times it was tested in our dataset (once by client), 
-\RF{This is a bit confusing, we said we have 10,274 clients with Atlas}
 \(r_{1_i} =  900 / 9024\), or 0.09973 (\emph{i.e.} roughly 10\% of the answers). 
 In other words, $r_{n_i}$ captures the
 \emph{rarity} of the DNS answer received by client $C_n$ for domain $i$.
@@ -30,21 +29,22 @@ this paper, here we also define \emph{distance} as \(1 - \)CNRE unless otherwise
 noted.
 
 \begin{figure}
-    \epsfig{file=figs/cnre.png, width=1\linewidth}
-    \caption{diagram illustrating CRNE}
-    \label{fig:cnre}
-\end{figure}
-
-An example of CNRE calculation is shown in Figure \ref{fig:cnre}.
-\RF{TODO: diagram explanation or remove the diagram?}
-
-\begin{figure}
-    \epsfig{file=figs/country_cdf.png, width=1\linewidth}
-    \caption{“High” closeness (90th percentile?) vs \# domains measured}
+    \epsfig{file=figs/90th.png, width=1\linewidth}
+    \caption{CDF showing the effect of the number of domains used for CNRE
+    calculation. The 500 clients and set of domains used for each CNRE
+    calculation were randomized.}
     \label{fig:90cnre}
 \end{figure}
 
-TODO: get 90th percentile plot and write about it
+In Figure \ref{fig:90cnre}, we plot the effects of the number of domains on CNRE
+statistics. For each data point, performed pairwise CNRE calculations between
+500, randomly selected clients. For each individual comparison, a random set of
+domains were selected, matching the quantity being tested. Both upper
+(90\textsuperscript{th}
+percentile) and lower (10\textsuperscript{th}) CNRE scores stabilize and plateau
+significantly between by 150 domains, showing no substantial changes as the
+number of domains increases beyond that. This validates our use of 160 domains
+as a cutoff for a client's admission into our dataset.
 
 \begin{figure}
     \epsfig{file=figs/domain_error.png, width=1\linewidth}
