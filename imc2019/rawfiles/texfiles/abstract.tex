@@ -15,11 +15,14 @@ Atlas clients around the world. To facilitate our research, we introduce common
 network resource exposure (CNRE) - a measure of the degree to which a pair of
 clients are exposed to the same network destinations as each other across a
 large set of domains. We explore the implications of high and low CNRE scores,
-and assess the applicability of well established network properties (country,
-ASN, BGP prefix, and /24) in estimating CNRE. Our findings expose clients that
+and assess the relationship between CNRE and well established network properties (country,
+ASN, and BGP prefix). 
+    
+By clustering clients that share high CNRE measures, we identify aggregate
+    catchment patterns encompassing 302 popular domains. Our findings expose clients that
 are poorly served by their current position in this aggregate mapping scheme and
-highlight the existence of ``outlier'' CDNs, who allocate their resources in a
-way that goes against broader Internet trends.
+show that a client's distance from the geographic center of their CNRE cluster is
+directly proportional to the latency they experience across providers.
 
 \end{abstract}
 
