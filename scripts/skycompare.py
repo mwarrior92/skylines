@@ -7,9 +7,9 @@ def count_answers_across_nodes(nodes, fname='datadir/pkls/answer_counts.pkl'):
     count = defaultdict(lambda: 0.0)
     for i in range(len(nodes)):
         for key in nodes[i].results.iteritems():
-            if type(key) is set:
-                for k in key:
-                    count[k] += 1.0
+            if type(key[1]) is set:
+                for k in key[1]:
+                    count[(key[0], k)] += 1.0
                     count[k[0]] += 1.0
             else:
                 count[key] += 1.0
