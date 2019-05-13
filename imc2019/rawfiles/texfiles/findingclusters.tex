@@ -1,15 +1,21 @@
 \section{Finding High CNRE Clusters} \label{sect:finding}
 
+\begin{figure*}
+    \epsfig{file=figs/dendrograms/v0.png, width=1\linewidth}
+    \caption{Dendrogram of CNRE distance across all client pairs}
+    \label{fig:dendrogram}
+\end{figure*}
+
 Finding aggregate catchments --- pools of clients essentially directed toward
-the same web resoures --- necessarily involves finding sets of clients with high
+the same web resources --- necessarily involves finding sets of clients with high
 CNRE measures between each other. Because CNRE is a measure of similarity, this
-problem naturally lends itself to heirarchical clustering techniques. We employ
-the complete linkage method to ensure cluster formation reflects commonalities
+problem naturally lends itself to hierarchical clustering techniques \cite{murtagh1983survey}. 
+We employ the complete linkage method to ensure cluster formation reflects commonalities
 across all cluster members as opposed to potentially edge-specific properties.
 Note that in all \emph{clustering} calculations, we opt to use the CNRE \emph{distance}
 (\(1-\)CNRE) as defined in Section \ref{sect:cnre}.
 
-Establishing heirchical clusters requires that we have some definition of what
+Establishing hierarchical clusters requires that we have some definition of what
 constitutes a \emph{high} or \emph{low} CNRE measure and at what threshold it is
 appropriate to consider clients sufficiently similar such that they appear in
 the same cluster. In this section, we explore the implications of various CNRE
@@ -163,3 +169,27 @@ however, requires more thorough consideration. In Figure \ref{fig:chbgp}
     given labeling scheme.}
     \label{fig:ch}
 \end{figure*}
+
+
+Figure \ref{fig:dendrogram} depicts the hierarchical clustering dendrogram based 
+on pairwise CNRE distances.
+This representation highlights the similarity of clients and different possible 
+partitioning.
+Each node in the tree is a cluster composed of the underneath denser clusters.
+A horizontal cut in the dendrogram produces a partitioning of clients  for which
+the dissimilarity of two probes in the same partition is not greater than the 
+y-value where the cut is done. 
+
+For example, the colored clusters in Figure~\ref{fig:dendrogram} are obtained 
+with a cut at $y=0.65$.
+This partitioning produces eight clusters including three small ones 
+composed of outliers.
+The five large clusters represent a very coarse partitioning of clients.
+95\% of probes in the green cluster are from Europe and 4\% are from Africa 
+(that is almost all African probes), the red cluster consists mainly of
+German, Italian, and Russian probes (79\%), the blue cluster is mainly North and
+South American probes (resp. 80\% and 18\%), the khaki cluster has mostly probes
+from Asia and Oceania (resp. 67\% and 32\%), and the black cluster is mostly
+North American probes (98\%).
+As each cluster is composed of smaller and denser clusters, one can again partition
+these clusters and form groups with clients having more network resources in common.
