@@ -2,6 +2,7 @@
 \begin{figure*}
     \epsfig{file=figs/dendrograms/v0.png, width=1\linewidth}
     \caption{Dendrogram of CNRE distance across all client pairs}
+    \label{fig:dendrogram}
 \end{figure*}
 
 \section{Finding Clusters} \label{sect:finding}
@@ -73,3 +74,28 @@ systems: country, ASN, BGP prefix, and /24 prefix subnet.
         }
     \caption{Completeness and homogeneity (for each feature) vs clustering distance threshold. The vertical line marks 0.73, the CNRE distance at which clients with different labels become distinguishable.}
 \end{figure*}
+
+
+Figure \ref{fig:dendrogram} depicts the hierarchical clustering dendrogram based 
+on pairwise CNRE distances.
+This representation highlights the similarity of clients and different possible 
+partitioning.
+Each node in the tree is a cluster composed of the underneath denser clusters.
+A horizontal cut in the dendrogram produces a partitioning of clients  for which
+the dissimilarity of two probes in the same partition is not greater than the 
+y-value where the cut is done. 
+
+For example, the colored clusters in Figure~\ref{fig:dendrogram} are obtained 
+with a cut at $y=0.65$.
+This partitioning produces eight clusters including three small ones 
+composed of outliers.
+The five large clusters represent a very coarse partitioning of clients.
+95\% of probes in the green cluster are from Europe and 4\% are from Africa 
+(that is almost all African probes), the red cluster consists mainly of
+German, Italian, and Russian probes (79\%), the blue cluster is mainly North and
+South American probes (resp. 80\% and 18\%), the khaki cluster has mostly probes
+from Asia and Oceania (resp. 67\% and 32\%), and the black cluster is mostly
+North American probes (98\%).
+
+%Each of these clusters can then be separated into 2 to 4 denser clusters.
+
