@@ -12,18 +12,37 @@ skyline cannot be anticipated by the artitect of a single  building, the
 controlled by any single entity.
 However, skylines can always be \emph{observed}.
 
+Even across a single network service, client experiences may diverge. In Figure
+\ref{fig:dnsmiss}, we provide a high level illustration of how this can happen.
+In subfigure \ref{fig:dns},  a client intending to connect to example.com submits a DNS query. We do not
+concern the minute details of
+the DNS resolution process, which is itself multi-tierd and possibly involving
+cooperation from many separate stakeholders. What is important to know is that
+eventually, the client's request reaches the nameserver responsible for
+example.com. The nameserver uses what is often internal, proprietary
+logic to decide which of example.com's network resources the client should be
+connected to. In subfigure \ref{fig:mismatch}, we are reminded that this client
+is not the only one access example.com. However, as illustrated,
+the client's peers may not necessarily be directed to the same resource, despite
+having carried out essentially the same DNS resolution process and possibly
+sharing the same edge network. This potential for mismatch between clients only
+grows as the number of domains considered increases --- which it will, often on
+a single web page.
+
 In this paper, we explore the complex combination of independently operating
 resource allocation schemes and assess their behavior in \emph{aggregate}. To
 enable our research, We introduce a new similarity measure, common network
 resource exposure (CNRE), which captures the extent to which a pair of clients
 are directed to the same network targets as each other across a broad set of
-domains. CNRE is, to our knowledge, the first ever attempt to quantify
+domains. CNRE is, to our knowledge, the first ever method to quantify
 cross-provider DNS redirection patterns and their collective behavior. 
 
-We test
-and assess CNRE using 302 web content hosting domains for each CNRE calculation.
-We performed over 40 million pairwise CNRE calculations for 9,024 globally
-distributed clients. 
+We test and assess CNRE using 302 web content hosting domains for each CNRE
+calculation.  To do this, we collect latency and DNS measurements for each
+domain from each of 9,024 globally distributed clients and perform over 40
+million pairwise CNRE calculations between them. Our experiments 
+validate common network research exposure as a useful quantity and explore its
+relationship with other cilent properties.
 
 \begin{figure*}
     \center
@@ -41,6 +60,7 @@ distributed clients.
         Illustration of network resource allocation. Figure \ref{fig:dns} shows DNS resolution at a high level: 1)~The client deploys a DNS query for example.com. 2) This query ultimately reaches nameserver responsible for example.com and decides which of example.com's network resources should serve the client. 3) The nameserver's resource selection is returned to the client. Figure \ref{fig:mismatch} shows an example of how clients with similarly described locations may
         be directed to distinct network resources.
     }
+    \ref{fig:dnsmiss}
 \end{figure*}
 
 In order to develop the Skyline model, we performed an exhaustive set of measurements to frame
