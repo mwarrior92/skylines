@@ -4,27 +4,27 @@
 indicate to routers where particular interfaces or subnets reside in the greater Internet
 \cite{bgp}. Domain
 names offer a simple, human-readable overlay for the complicated, often multiplexed addressing
-scheme underneath \cite{dns}. Autonomous system (AS) numbers often help to distingish one network
+scheme underneath \cite{dns}. Autonomous system (AS) numbers often help to distinguish one network
 from another \cite{asn}.
 Names and labels such as these, whatever form they take, allow us to organize immense network spaces
 with manageable and descriptive abstractions.
 
 Unfortunately, a single name is often not enough. One machine can be described in terms of all of
 the examples listed above, and more. This is because it is important that names carry information
-relavant to the specific way in which they will be used. Routers are unable to direct traffic with
+relevant to the specific way in which they will be used. Routers are unable to direct traffic with
 domain names, just as humans cannot be expected to remember the plethora IP addresses they access
 every day. While it is intuitive that no labeling system is applicable across all possible
 dimensions, in practice, this fact is often taken for granted or neglected entirely.
 
 In this project, we challenge the careless application of conventional client labeling schemes in
-Internet measurement experiments, particulary those subject to the effects of DNS redirection and
-CDN PoP (point of presence) catchment formation. we uncover and quantify the degree of misalignment
+Internet measurement experiments, particularly those subject to the effects of DNS redirection and
+CDN PoP (point of presence) catchment formation. We uncover and quantify the degree of misalignment
 between experimentally determined aggregate catchments and labels often assumed to indicate
 ``similarity" between clients --- country, AS number, announced BGP prefix, and /24 subnet --- and
 use this to design the Skyline model, a grouping system which describes clients' relative distances
 from each other in terms of their \emph{common network resource exposure} (CNRE). Describing clients in such
 terms highlights what should be a chief concern in large scale Internet measurement platforms and
-network optimization efforts: the sets of clients actually being directed the same resources.
+network optimization efforts: the sets of clients actually being directed to the same resources.
 
 \begin{figure*}
     \center
@@ -39,30 +39,30 @@ network optimization efforts: the sets of clients actually being directed the sa
             \end{subfigure}
         }
     \caption{
-        Illustration of network resource resource allocation. Subfigure \ref{fig:dns} shows DNS resolution at a high level: 1) The client deploys a DNS query for example.com. 2) This query ultimately reaches nameserver responsible for example.com and decides which of example.com's network resources should serve the client. 3) The nameserver's resource selection is returned to the client. Subfigure \ref{fig:mismatch} shows an example of how clients with similarly described locations may
+        Illustration of network resource resource allocation. Figure \ref{fig:dns} shows DNS resolution at a high level: 1) The client deploys a DNS query for example.com. 2) This query ultimately reaches nameserver responsible for example.com and decides which of example.com's network resources should serve the client. 3) The nameserver's resource selection is returned to the client. Figure \ref{fig:mismatch} shows an example of how clients with similarly described locations may
         be directed to distinct network resources.
     }
 \end{figure*}
 
 In order to develop the Skyline model, we performed an exhaustive set of measurements to frame
-client experience on a per \emph{site} basis. In our completed, preliminary work, we capture a
+client experience on a per \emph{site} basis. In this work, we capture a
 snapshot of both DNS resolutions and latency measurements toward the 304 domains that appeared most
 frequently in the top 2441 most popular webpages. Our measurements span over 10,000 unique
-clients spread across 185 countries and 3637 autonomous systems. we performed over 52 million pairwise
+clients spread across 185 countries and 3637 autonomous systems. We performed over 52 million pairwise
 comparisons with the results of these measurements to arrive at the foundation of what we have
 coined the ``Skyline model". 
 
-With this project, we make the following contributions, including those we expect to stem from
-proposed work, which we have designated with (\emph{p})
+This project makes the following contributions: %, including those we expect to stem from
+%proposed work, which we have designated with (\emph{p})
 
-\begin{itemize}\parskip0pt \parsep0pt
-    \item we perform a large exploration of client network performance on a per webpage level. Our
+\begin{itemize}%\parskip0pt \parsep0pt
+    \item We perform a large exploration of client network performance on a per webpage level. Our
         raw results are publically available on the RIPE Atlas platform.
-    \item (\emph{p}) we quantify the degree of misalignment between conventional grouping schemes
+    \item  We quantify the degree of misalignment between conventional grouping schemes
         and aggregate catchments.
-    \item (\emph{p}) we introduce the Skyline model, a client grouping scheme that reflects the
+    \item  We introduce the Skyline model, a client grouping scheme that reflects the
         extent of CNRE.
-    \item (\emph{p}) Using the Skyline model, we identify and analyze network resource islands --- 
+    \item  Using the Skyline model, we identify and analyze network resource islands --- 
         sets of clients with very high degrees CNRE. 
 \end{itemize}
 
