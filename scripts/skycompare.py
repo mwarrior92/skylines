@@ -10,7 +10,7 @@ def count_answers_across_nodes(nodes, fname='datadir/pkls/answer_counts.pkl'):
             if type(key[1]) is set:
                 for k in key[1]:
                     count[(key[0], k)] += 1.0
-                    count[k[0]] += 1.0
+                    count[key[0]] += 1.0
             else:
                 count[key] += 1.0
                 count[key[0]] += 1.0
