@@ -1,0 +1,26 @@
+\subsection{Why Web Object Domains}
+
+In Section \ref{domcollect}, we described how the set of domains used in our
+experiment were selected. The selected domains were extracted directly
+from web object URLs observed across the set of web pages we checked. We note
+here that these domains are often abstractions of more explicit hosting schemes.
+For example, such domains may resolve to unique CNAMES CITE or directly resolve
+to third party CDN addresses CITE. In contrast to our approach, we could have
+converted each domain into some lower level representation (such as its CDN) and
+in turn performed a CNRE-like measurement study using this representation
+(\emph{i.e.}, ping from each client to each CDN in our set).
+
+While this alternative approach may provide its own insights, we chose leave
+each discovered domain ``as is'' for two reasons. First, although a given domain
+may use CDN hosting, it is worth noting that modern CDN selection techniques are
+complex and diverse. While some content providers may opt to utilize a
+\emph{single} CDN for their purposes, it has also become common practice to
+instead depend on CDN \emph{brokers} or \emph{multi} CDNs to dynamically (by
+cost, performance, geography, \emph{etc.}) make use of a set of CDNs. In other
+words, the ``less abstract'' representation of a given content provider is, in
+many cases, far from comprehensive with regard to a diverse set of clients. Second, even if a domain or content provider could adequately be reduced to a
+lower level description as described, the performance of a given CDN ``in
+general'' is not necessarily representative of the performance of one of its
+customers. The reasons for this are plentiful, ranging from customer specific
+policies and agreements (for example, the customer might purchase region specific
+support) to caching algorithms and load balancing. 
