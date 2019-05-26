@@ -1,3 +1,4 @@
+import sys
 from skyclusters import SkyClusterBuilder
 from skycompare import NodeComparison
 from experimentdata import ExperimentData, DataGetter
@@ -79,33 +80,6 @@ class ClusterAnalysis(ExperimentData):
         cs = completeness_score(labels, clusters)
         return {'homogeneity': hs, 'completeness': cs}
 
-    def get_per_site_differences(self, cluster):
-        '''
-        set of differing answers from a cluster and determine rarity outside of cluster
-        TODO: use the existing pkls for this (get # times ans appears in cluster from cluster
-        and get times ans appears overall via pkl); will be much faster than crawling all probes
-        '''
-        answers = defaultdict(lambda: defaultdict(set))
-        for i in cluster:
-            for site, addrs in self.scb.nodes[i].results:
-                for addr in addrs:
-                    answers[site][addr].add(i)
-        D = DataGetter()
-        with open(D.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
-            global_counts = pkl.load(f)
-        mergeables = dict()
-        for site in answers:
-            if len(answers[site]) > 1:
-                uniques = list()
-                for addr in answers[site]:
-                    world = float(global_counts[(site,addr)])
-                    coverage = float(len(answers[site][addr])) / world
-                    if coverage >= 0.90:
-                        uniques.append((addr, coverage, answers[site][addr]))
-                if len(uniques) > 1:
-                    mergeables[site] = uniques
-        return mergeables
-
     def get_addr_differences(self, cluster):
         '''
         set of differing answers from a cluster and determine rarity outside of cluster
@@ -115,16 +89,16 @@ class ClusterAnalysis(ExperimentData):
         for i in cluster:
             for site, addrs in self.scb.nodes[i].results:
                 for addr in addrs:
-                    answers[addr].add(i)
+                    answers[(site, addr)].add(i)
         D = DataGetter()
         with open(D.fmt_path('datadir/pkls/flat_answer_counts.pkl'), 'r') as f:
             global_counts = pkl.load(f)
-        uniques = list()
-        for addr in answers:
+        uniques = defaultdict(list)
+        for site, addr in answers:
             world = float(global_counts[(site,addr)])
-            coverage = float(len(answers[site][addr])) / world
+            coverage = float(len(answers[(site,addr)])) / world
             if coverage >= 0.90:
-                uniques.append((addr, coverage, answers[site][addr]))
+                uniques[site].append(addr)
         return uniques
 
     def compare_mergeables(self, cluster, mergeables):
@@ -138,6 +112,7 @@ class ClusterAnalysis(ExperimentData):
         for site in mergeables:
             if site in pings:
                 comps[site] = list()
+
     def merge_answers(self, cluster, mergeables):
         '''
         TODO: this should also make a new corresponding pkl
@@ -232,16 +207,30 @@ class ClusterAnalysis(ExperimentData):
         how much did site answers match for a given cluster
         TODO: maybe we can use homogeneity to do this?
         '''
-        answers = defaultdict(lambda: defaultdict(set))
+        answers = defaultdict(set)
         tests = defaultdict(int)
         for i in cluster:
-            for site, addrs in self.scb.nodes[i].results:
+            sys.stdout.write('p'+str(i)+',')
+            sys.stdout.flush()
+            for site, addrs in self.scb.nodes[i].results.items():
                 for addr in addrs:
                     tests[site] += 1
                     answers[site].add(addr)
         counts = dict()
-        for site in tests:
-            t = float(len(tests[site]))
-            a = float(len(answers[site]))
-            counts[site] = a/t
+        for i in tests:
+            sys.stdout.write('t'+str(i)+',')
+            sys.stdout.flush()
+            t = float(tests[i])
+            if t == 0:
+                continue
+            a = float(len(answers[i]))
+            pings = self.scb.nodes.get_pings_for_domain(cluster,i)
+            if len(pings):
+                pings = [np.mean(z) for z in pings.res.to_list() if z]
+                pings = np.median(pings)
+            else:
+                pings = -1
+            site = self.scb.nodes.get_raw_domain(i)
+            total = self.scb.kwargs['counts'][i]
+            counts[site] = (a/t, total, pings)
         return counts

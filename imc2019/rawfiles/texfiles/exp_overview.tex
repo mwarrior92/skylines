@@ -42,7 +42,7 @@ announcement allowed, by convention) as a potentially distinct resource, noting
 that it may be the case that larger providers operate with smaller (more coarse
 grained) prefixes.
 
-\subsection{Domain Collection}
+\subsection{Domain Collection} \label{domcollect}
 
 We use the top 10,000 most frequently resolved domains from Cisco's Umbrella Top
 1-Million list \cite{scheitle2018} as a starting point. 
@@ -75,9 +75,7 @@ client per day, thus further restricting the number of domains to be used in our
 experiment. Since the entire set obtained was large, we \emph{ranked}
 object hosting domains by how frequently they were observed across our set of HAR
 files. The most frequently appearing object hosting domains were given priority.
-Ultimately, 304 domains were used for the work described in this paper. 
-
-\RF{the number 304 still looks very arbitrary?}
+Based on this prioritization, we arbitrarily used the top 304 domains from this set. 
 
 \begin{figure}
     \epsfig{file=figs/num_sites_covered_by_top_n_doms.png, width=1\linewidth}

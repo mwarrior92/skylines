@@ -121,6 +121,31 @@ def plot_geodfm_vs_cnredfm():
     pass
 
 
+def get_domain_alignment((i,c)):
+    print('cluster '+str(i))
+    return g_ca.get_domain_alignment(c)
+
+
+def plot_domain_alignment():
+    counts = defaultdict(list)
+    all_sets = list()
+    pool = Pool()
+    for tmp_counts in pool.imap_unordered(get_domain_alignment, enumerate(g_clusters)):
+        all_sets.append(tmp_counts)
+    try:
+        with open(g_ca.fmt_path('datadir/domain_alignment/raw.json'),'w') as f:
+            json.dump(all_sets,f)
+    except:
+        print('failed to save raw')
+    with open(g_ca.fmt_path('datadir/domain_alignment/per_cluster.json'),'w') as f:
+        for counts in all_sets:
+            data = sorted([[k]+list(counts[k]) for k in counts], key=lambda z: z[1])[:4]
+            json.dump(data,f)
+            f.write('\n')
+            f.write('---------------------------------------------------------\n\n')
+
+
+
 if __name__ == '__main__':
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder()
@@ -128,10 +153,14 @@ if __name__ == '__main__':
     with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
         g_scb.kwargs['counts'] = pkl.load(f)
     global g_ca
-    g_scb.nodes.load_pings()
+    #g_scb.nodes.load_pings()
+    g_scb.nodes.attach_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
     g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
     #plot_perf_vs_geo(2)
-    plot_geo_centers()
+    #plot_geo_centers()
+    '''
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
-        f.write(str(len(g_clusters)))
+        f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
+    '''
+    plot_domain_alignment()

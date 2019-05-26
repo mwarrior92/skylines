@@ -84,6 +84,14 @@ class Nodes(ExperimentData):
         self._probes_df = self._probes_df.assign(pings=[p.get_ping_stats(z) for z \
                 in self._probes_df.probe])
 
+    def attach_pings(self):
+        self.pingdata = skypings.Pings()
+
+    def get_pings_for_domain(self, nodes, domain):
+        if not hasattr(self, 'pingdata'):
+            self.attach_pings()
+        return self.pingdata.get_pings(nodes, domain)
+
     def keep_only(self, fields):
         fields = set(fields)
         fields.add('idx')
