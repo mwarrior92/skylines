@@ -157,27 +157,28 @@ def get_dist_list(i):
         return []
 
 
-def plot_geo_std(workers):
+def plot_geo_mean(workers):
     pool = Pool(workers)
     stats = list()
     for dists in pool.imap_unordered(get_dist_list, range(len(g_clusters))):
         if dists:
             std = np.std(dists, ddof=1)
             diameter = float(max(dists))
-            ratio = float(std)/diameter
-            stats.append((std,diameter,ratio))
+            u = np.mean(dists)
+            length = len(dists)
+            stats.append((std,diameter,u, length))
     with open(g_ca.fmt_path('datadir/geo_stds/raw.json'),'w') as f:
         json.dump(stats,f)
     fig, ax = plt.subplots(figsize=(6,3.5))
-    stds, diameters, rats = zip(*stats)
-    ecdf = ECDF(stds)
+    stds, diameters, us, length = zip(*stats)
+    ecdf = ECDF(us)
     ax.plot(list(ecdf.x), list(ecdf.y))
-    m = np.median(stds)
+    m = np.median(us)
     ax.axvline(m, color='r', linestyle='--')
     ax.text(m, 0.85, str(m).split('.')[0], ha='center', va='center', backgroundcolor='white')
-    ax.set_xlabel('sample std (km)')
+    ax.set_xlabel('mean geographic distance (km)')
     ax.set_ylabel('CDF')
-    fig.savefig(g_ca.fmt_path('plotsdir/geo_stds/plot.png'))
+    fig.savefig(g_ca.fmt_path('plotsdir/geo_means/geo_means.png'))
     plt.close(fig)
 
 
@@ -192,8 +193,8 @@ if __name__ == '__main__':
     g_scb.nodes.load_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
     g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
-    #plot_perf_vs_geo(2)
-    plot_geo_std(2)
+    plot_perf_vs_geo(2)
+    plot_geo_mean(2)
     #plot_geo_centers()
     '''
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:

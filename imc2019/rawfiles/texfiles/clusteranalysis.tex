@@ -2,16 +2,19 @@
 
 Now that we have built up an understanding of how CNRE behaves, we move to
 investigate the aggregate catchments of clients using clustering techniques
-discussed in the previous section. In this section, we use the discussed
-CNRE threshold of 0.73 for cluster formation. This threshold yields 870 clusters
-with a median cluster size of REF.
+discussed in the previous section. In this section, we use the aforementioned
+CNRE threshold of 0.73 for cluster formation. This threshold yields 870
+clusters.  For analysis, in which we compare clients that cohabit the same
+cluster, we consider only clusters for which our dataset has a representation of
+at least three clients; this yields 612 clusters from the original 870. The
+average cluster size from this reduced set is 218 members, with a standard
+deviation of 816 and a median size of 36. Note that cluster size variety is
+significantly impacted by our dataset, which has more client representation
+in western Europe and North America than in the rest of the world where RIPE's
+influence is more sparse CITE.
 
-\begin{figure}
-    \epsfig{file=figs/geo_vs_perf.png, width=1\linewidth}
-    \caption{CDF of \# of outliers per cluster for geo distance, etc}
-\end{figure}
+\input{texfiles/geographicspread.tex}
 
-In 
 
 \begin{figure}
     \epsfig{file=figs/country_cdf.png, width=1\linewidth}

@@ -207,9 +207,8 @@ class ClusterAnalysis(ExperimentData):
             dists[i].append(d)
             dists[j].append(d)
         for i in dists:
-            dists[i] = np.mean(dists[i])
-        mean = np.mean(list(dists.values()))
-        center = sorted(list(dists.keys()), key=lambda z: abs(dists[z]-mean))[0]
+            dists[i] = sum(dists[i])
+        center = sorted(list(dists.keys()), key=lambda z: dists[z])[0]
         center_loc = self.scb.nodes[center].coords[0]
         center_loc = [center_loc[1], center_loc[0]]
         return (center, center_loc, {z[0]: vincenty(z[1], center_loc).km for z in nodes})
