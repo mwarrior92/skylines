@@ -150,6 +150,22 @@ class ClusterAnalysis(ExperimentData):
             dists[i] = np.mean(dists[i])
         return dict(dists)
 
+    def get_inner_geo_list(self, cluster):
+        nodes = list()
+        for z in cluster:
+            coords = self.scb.nodes[z].coords
+            if not coords or not coords[0]:
+                continue
+            else:
+                coords = coords[0][1], coords[0][0]
+            nodes.append((z,coords))
+        nodes = [(z[0],z[1][0]) for z in nodes if z[1]]
+        dists = list()
+        for (i,a),(j,b) in itertools.combinations(nodes, 2):
+            d = vincenty(a, b).km
+            dists.append(d)
+        return dists
+
     def get_inner_performance(self, cluster):
         nodes = [(z,self.scb.nodes[z].pings) for z in cluster]
         nodes = {z[0]:(z[1][0], z[1][2]) for z in nodes if z[1]}

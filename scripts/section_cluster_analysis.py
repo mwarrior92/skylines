@@ -30,6 +30,8 @@ def get_geo_vs_perf(i):
     '''
     try:
         cluster = g_clusters[i]
+        if len(cluster) < 3:
+            return {}
         try:
             geocenter, geocenterloc, geo = g_ca.get_dists_from_geo_center(cluster)
         except:
@@ -145,6 +147,40 @@ def plot_domain_alignment():
             f.write('---------------------------------------------------------\n\n')
 
 
+def get_dist_list(i):
+    cluster = g_clusters[i]
+    if len(cluster) < 3:
+        return []
+    try:
+        return g_ca.get_inner_geo_list(cluster)
+    except:
+        return []
+
+
+def plot_geo_std(workers):
+    pool = Pool(workers)
+    stats = list()
+    for dists in pool.imap_unordered(get_dist_list, range(len(g_clusters))):
+        if dists:
+            std = np.std(dists, ddof=1)
+            diameter = float(max(dists))
+            ratio = float(std)/diameter
+            stats.append((std,diameter,ratio))
+    with open(g_ca.fmt_path('datadir/geo_stds/raw.json'),'w') as f:
+        json.dump(stats,f)
+    fig, ax = plt.subplots(figsize=(6,3.5))
+    stds, diameters, rats = zip(*stats)
+    ecdf = ECDF(stds)
+    ax.plot(list(ecdf.x), list(ecdf.y))
+    m = np.median(stds)
+    ax.axvline(m, color='r', linestyle='--')
+    ax.text(m, 0.85, str(m).split('.')[0], ha='center', va='center', backgroundcolor='white')
+    ax.set_xlabel('sample std (km)')
+    ax.set_ylabel('CDF')
+    fig.savefig(g_ca.fmt_path('plotsdir/geo_stds/plot.png'))
+    plt.close(fig)
+
+
 
 if __name__ == '__main__':
     global g_scb
@@ -153,14 +189,15 @@ if __name__ == '__main__':
     with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
         g_scb.kwargs['counts'] = pkl.load(f)
     global g_ca
-    #g_scb.nodes.load_pings()
-    g_scb.nodes.attach_pings()
+    g_scb.nodes.load_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
     g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
     #plot_perf_vs_geo(2)
+    plot_geo_std(2)
     #plot_geo_centers()
     '''
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
         f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
     '''
-    plot_domain_alignment()
+    #g_scb.nodes.attach_pings()
+    #plot_domain_alignment()

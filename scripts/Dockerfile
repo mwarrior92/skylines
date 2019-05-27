@@ -17,5 +17,6 @@ RUN pip install -U scikit-learn
 RUN pip install geopandas
 RUN pip install descartes
 RUN pip install shapely
+RUN pip install geoplot
 CMD [ "python", "section_cluster_analysis.py" ]
 
