@@ -1,7 +1,7 @@
 \section{Finding High CNRE Clusters} \label{sect:finding}
 
 \begin{figure*}
-    \epsfig{file=figs/dendrograms/v0.png, width=1\linewidth}
+    \epsfig{file=figs/dendrograms/v1.png, width=1\linewidth}
     \caption{Dendrogram of CNRE distance across all client pairs}
     \label{fig:dendrogram}
 \end{figure*}
@@ -22,25 +22,36 @@ the same cluster. In this section, we explore the implications of various CNRE
 values, as well as CNRE's relationship with other, well-established client grouping
 systems: country, ASN, BGP prefix, and /24 prefix subnet.
 
-\begin{figure*}
-    \epsfig{file=figs/dendrograms/v0.png, width=1\linewidth}
-    \caption{Dendrogram of CNRE distance across all client pairs}
-    \label{fig:dendrogram}
-\end{figure*}
+%\begin{figure*}
+    %\epsfig{file=figs/dendrograms/v0.png, width=1\linewidth}
+    %\caption{Dendrogram of CNRE distance across all client pairs}
+    %\label{fig:dendrogram}
+%\end{figure*}
 
 \subsection{Group Formation Patterns}
 \label{s:formation}
 
 Figure \ref{fig:dendrogram} presents a dendrogram derived from pairwise CNRE
-distances across all clients and highlights three levels of distinct behavior
-regarding the distribution of CNRE distances. First, in the uppermost portion of
-the plot --- where CNRE distances are beyond a threshold of 0.63 --- we see
+distances across all clients and highlights two levels of distinct behavior
+regarding the distribution of CNRE distances. In the uppermost portion of
+the plot --- where CNRE distances are beyond a threshold of 0.65 --- we see
 that distinctions between branches and their implied client groups become well
-defined. Second, in the middle region of the tree, between CNRE distances of
-0.25 and 0.63, we see that branches begin to fork unpredictably with shorter
-changes in CNRE distance. Finally, in the lowest region of the plot, where CNRE
-distances drop below 0.25, we see the amount of branching increase once again,
-rapidly increasing the granularity of each branch as CNRE decreases further. 
+defined. 
+There is a large cluster composed mainly of European and African probes (green 
+cluster labelled \emph{Europe 95\%}), one representing East Europe (red cluster 
+labelled \emph{DE 56\%}), one composed of North and South American probes (blue
+cluster labelled \emph{US 59\%}), a cluster composed of probes from Asia
+and Oceania (khaki cluster), and one made exclusively with American probes
+(black cluster labelled \emph{North America 98\%}).
+In the lower region of the tree, where CNRE distances drop below 0.65, we see 
+that branches begin to fork unpredictably with shorter changes in CNRE distance. 
+Some of these branches may map to specific countries, but at finer granularities
+the geographical location of probes delineate poorly the characteristics
+of the clusters.
+%we mainly observe clusters with weaker correlations to the probe locations.
+%Finally, in the lowest region of the plot, where CNRE
+%distances drop below 0.25, we see the amount of branching increase once again,
+%rapidly increasing the granularity of each branch as CNRE decreases further. 
 
 
 \begin{figure*}
