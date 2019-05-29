@@ -22,6 +22,7 @@ from descartes import PolygonPatch
 import matplotlib.colors as colors
 from matplotlib.ticker import ScalarFormatter, LogFormatter
 from shapely.geometry import Point, Polygon
+from geopy.distance import geodesic as vincenty
 
 
 def get_geo_vs_perf(i):
@@ -94,7 +95,7 @@ def plot_perf_vs_geo(workers=2):
     fig, ax = plt.subplots(figsize=(6,3.5))
     ax.scatter(x,y)
     ax.plot(x, [offset + slope*z for z in x], 'r')
-    ax.set_xlabel('mean distance (km)')
+    ax.set_xlabel('geo. distance from center (km)')
     ax.set_ylabel('mean ping (ms)')
     fig.savefig(g_ca.fmt_path('plotsdir/geo_vs_perf/raw.png'))
     plt.close(fig)
@@ -182,23 +183,138 @@ def plot_geo_mean(workers):
     plt.close(fig)
 
 
+def get_the_center(i):
+    try:
+        return i, g_ca.get_dists_from_geo_center(g_clusters[i])[:2]
+    except Exception as e:
+        print(e)
+        return i, None
+
+
+def sort_the_cneters(i):
+    cluster = g_clusters[i]
+    coords = dict()
+    for z in cluster:
+        tmp = g_ca.scb.nodes[z].coords
+        if tmp:
+            coords[z] = tuple(reversed(tmp[0]))
+    out = list()
+    for client, crd in coords.items():
+        try:
+            dists = list()
+            cid, ctr = g_centers[i]
+            if client == cid:
+                continue
+            di = vincenty(crd, ctr).km
+            cnrei = g_ca.scb.cnre(client, cid)
+            for j, (cid, ctr) in g_centers.items():
+                if i != j:
+                    d = vincenty(crd, ctr).km
+                    cnre = g_ca.scb.cnre(client, cid)
+                    dists.append((j,cnre,d))
+            dists = sorted(dists, key=lambda z: z[-1])
+            out.append((client, i, cnrei, di, dists))
+        except Exception as e:
+            print(str(crd)+', '+str(g_centers[i]))
+            sys.stdout.flush()
+            traceback.print_exception(*sys.exc_info())
+            raise e
+    return out
+
+def get_nearest_centers(workers):
+    global g_centers
+    g_centers = dict()
+    pool = Pool(workers)
+    for i, center in pool.imap_unordered(get_the_center, g_clusters.keys()):
+        if center:
+            g_centers[i] = center
+    pool.terminate()
+    pool = Pool(workers)
+    data = list()
+    print('len: '+str(len(g_centers)))
+    progress = 0
+    for out in pool.imap_unordered(sort_the_cneters, g_centers.keys()):
+        data += out
+        progress += 1
+        print(progress)
+        sys.stdout.flush()
+    with open(g_ca.fmt_path('datadir/all_center_dists.json'),'w') as f:
+        json.dump(data, f)
+    tops = list()
+    for item in data:
+        client, group, ctr_cnre, ctr_dist, dists = item
+        closest_ctr_grp, closest_ctr_cnre, closest_ctr_dist = dists[0]
+        tops.append((group, closest_ctr_grp, ctr_cnre, closest_ctr_cnre,
+            ctr_dist, closest_ctr_dist))
+    with open(g_ca.fmt_path('datadir/nearest_centers.json'),'w') as f:
+        json.dump(tops,f)
+
+
+def plot_nearest_centers():
+    D = DataGetter()
+    with open(D.fmt_path('datadir/nearest_centers.json'),'r') as f:
+        data = json.load(f)
+
+    cnres = list()
+    dists = list()
+    for item in data:
+        _, _, c0, c1, d0, d1 = item
+        cnres.append((1.0-c0, 1.0-c1))
+        dists.append((d0, d1))
+    x,y = zip(*cnres)
+    #rng = [minlim, maxlim]
+    #heatmap, x, y = np.histogram2d(x,y,bins=100, range=[rng,rng])
+    #extent = [x[0], x[-1], y[0], y[-1]]
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.scatter(x,y, alpha=0.1)
+    minlim = min([ax.get_xlim()[0], ax.get_ylim()[0]])
+    maxlim = max([ax.get_xlim()[1], ax.get_ylim()[1]])
+    #pos = ax.imshow(heatmap.T, extent=extent, origin='lower', cmap='Greys')
+    #fig.colorbar(pos)
+    ax.set_xlabel('CNRE with default center')
+    ax.set_ylabel('CNRE with closest center')
+    ax.plot([minlim,maxlim],[minlim, maxlim], 'r')
+    fig.savefig(D.fmt_path('plotsdir/nearest_centers_cnre.png'))
+    plt.close(fig)
+    x,y = zip(*dists)
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.scatter(x,y, alpha=0.1)
+    ax.set_xlabel('km to default center')
+    ax.set_ylabel('km to closest center')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    minlim = min([ax.get_xlim()[0], ax.get_ylim()[0]])
+    maxlim = max([ax.get_xlim()[1], ax.get_ylim()[1]])
+    ax.set_xlim([minlim,maxlim])
+    ax.set_ylim([minlim,maxlim])
+    ax.plot([minlim,maxlim],[minlim,maxlim], 'r')
+    fig.savefig(D.fmt_path('plotsdir/nearest_centers_dist.png'))
+    plt.close(fig)
 
 if __name__ == '__main__':
+    '''
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder()
     g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
     with open(g_scb.fmt_path('datadir/pkls/answer_counts.pkl'), 'r') as f:
         g_scb.kwargs['counts'] = pkl.load(f)
     global g_ca
-    g_scb.nodes.load_pings()
+    #g_scb.nodes.load_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
-    g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
-    plot_perf_vs_geo(2)
-    plot_geo_mean(2)
+    #g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
+    #with open(g_ca.fmt_path('datadir/g_clusters.json'),'w') as f:
+    #    json.dump([list(z) for z in g_clusters],f)
+    #plot_perf_vs_geo(2)
+    #plot_geo_mean(2)
     #plot_geo_centers()
-    '''
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
         f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
-    '''
     #g_scb.nodes.attach_pings()
     #plot_domain_alignment()
+    g_ca.scb.nodes.keep_only('coords')
+    with open(g_scb.fmt_path('datadir/g_clusters.json'),'r') as f:
+        g_clusters = json.load(f)
+    g_clusters = {i: g_clusters[i] for i in range(len(g_clusters)) if len(g_clusters[i]) > 2}
+    get_nearest_centers(2)
+    '''
+    plot_nearest_centers()

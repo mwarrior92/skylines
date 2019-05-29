@@ -9,7 +9,8 @@ from collections import defaultdict
 from sklearn.metrics.cluster import homogeneity_score, completeness_score
 import itertools
 import cPickle as pkl
-from geopy.distance import vincenty
+#from geopy.distance import vincenty
+from geopy.distance import geodesic as vincenty
 
 class ClusterAnalysis(ExperimentData):
     def __init__(self, matrix_file=None, **kwargs):
