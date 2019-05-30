@@ -135,7 +135,7 @@ def get_domain_alignment(i):
 def plot_domain_alignment():
     counts = defaultdict(list)
     all_sets = list()
-    pool = Pool()
+    pool = Pool(3)
     for tmp_counts in pool.imap_unordered(get_domain_alignment, range(len(g_clusters))):
         if tmp_counts:
             all_sets.append(tmp_counts)
@@ -345,6 +345,7 @@ if __name__ == '__main__':
         f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
     #g_scb.nodes.attach_pings()
     '''
+    g_ca.scb.nodes.keep_only([])
     plot_domain_alignment()
     '''
     g_ca.scb.nodes.keep_only('coords')
