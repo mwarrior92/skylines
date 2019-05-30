@@ -124,28 +124,62 @@ def plot_geodfm_vs_cnredfm():
     pass
 
 
-def get_domain_alignment((i,c)):
+def get_domain_alignment(i):
     print('cluster '+str(i))
+    c = g_clusters[i]
+    if len(c) < 3:
+        return None
     return g_ca.get_domain_alignment(c)
 
 
 def plot_domain_alignment():
     counts = defaultdict(list)
     all_sets = list()
-    pool = Pool()
-    for tmp_counts in pool.imap_unordered(get_domain_alignment, enumerate(g_clusters)):
-        all_sets.append(tmp_counts)
+    pool = Pool(2)
+    for tmp_counts in pool.imap_unordered(get_domain_alignment, range(len(g_clusters))):
+        if tmp_counts:
+            all_sets.append(tmp_counts)
     try:
         with open(g_ca.fmt_path('datadir/domain_alignment/raw.json'),'w') as f:
             json.dump(all_sets,f)
     except:
         print('failed to save raw')
-    with open(g_ca.fmt_path('datadir/domain_alignment/per_cluster.json'),'w') as f:
-        for counts in all_sets:
-            data = sorted([[k]+list(counts[k]) for k in counts], key=lambda z: z[1])[:4]
-            json.dump(data,f)
-            f.write('\n')
-            f.write('---------------------------------------------------------\n\n')
+    data = list()
+    means = dict()
+    for i, cluster in enumerate(all_sets):
+        alns, sizes, perfs = zip(*cluster.values())
+        mean_aln = np.mean(alns)
+        perfs = [z for z in perfs if z > 0]
+        if perfs:
+            mean_perf = np.mean(perfs)
+        else:
+            mean_perf = None
+        means[i] = (mean_aln, mean_perf)
+        for dom, val in cluster.items():
+            aln, s, perf = val
+            data.append((dom, aln - mean_aln,
+                perf - mean_perf if mean_perf and perf else None))
+    with open(g_ca.fmt_path('datadir/domain_alignment/deviations.json'),'w') as f:
+        json.dump(data,f)
+    doms, aln_devs, perf_devs = zip(*data)
+    fig, ax = plt.subplots(figsize=(6,3.5))
+    ecdf = ECDF(aln_devs)
+    ax.plot(list(ecdf.x), list(ecdf.y))
+    ax.set_xlabel('distance from mean alignment')
+    ax.set_ylabel('CDF')
+    fig.savefig(g_ca.fmt_path('plotsdir/domain_alignment/alignment.png'))
+    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(6,6))
+    heatmap, x, y = np.histogram2d(aln_devs,perf_devs,bins=50, range=[rng,rng])
+    extent = [x[0], x[-1], y[0], y[-1]]
+    pos = ax.imshow(heatmap.T, extent=extent, origin='lower', cmap='Greys')
+    fig.colorbar(pos)
+    ax.set_xlabel('distance from mean alignment')
+    ax.set_ylabel('distance from mean performance')
+    fig.savefig(g_ca.fmt_path('plotsdir/domain_alignment/align_vs_perf.png'))
+    plt.close(fig)
+
+
 
 
 def get_dist_list(i):
@@ -292,7 +326,6 @@ def plot_nearest_centers():
     plt.close(fig)
 
 if __name__ == '__main__':
-    '''
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder()
     g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
@@ -301,7 +334,8 @@ if __name__ == '__main__':
     global g_ca
     #g_scb.nodes.load_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
-    #g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
+    g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
+    '''
     #with open(g_ca.fmt_path('datadir/g_clusters.json'),'w') as f:
     #    json.dump([list(z) for z in g_clusters],f)
     #plot_perf_vs_geo(2)
@@ -310,11 +344,13 @@ if __name__ == '__main__':
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
         f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
     #g_scb.nodes.attach_pings()
-    #plot_domain_alignment()
+    '''
+    plot_domain_alignment()
+    '''
     g_ca.scb.nodes.keep_only('coords')
     with open(g_scb.fmt_path('datadir/g_clusters.json'),'r') as f:
         g_clusters = json.load(f)
     g_clusters = {i: g_clusters[i] for i in range(len(g_clusters)) if len(g_clusters[i]) > 2}
     get_nearest_centers(2)
-    '''
     plot_nearest_centers()
+    '''
