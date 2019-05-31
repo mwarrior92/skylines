@@ -238,7 +238,6 @@ class ClusterAnalysis(ExperimentData):
                 continue
             a = float(len(answers[i]))
             pings = self.scb.nodes.get_pings_for_domain(probes,i)
-            print(pings)
             if len(pings):
                 pings = [np.mean(z) for z in pings.res.to_list() if z]
                 pings = np.median(pings)

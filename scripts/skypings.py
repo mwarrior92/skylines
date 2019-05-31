@@ -1,4 +1,3 @@
-import json
 from experimentdata import ExperimentData, DataGetter
 import pandas
 import numpy as np
@@ -16,7 +15,7 @@ class Pings(ExperimentData):
 
     def get_pings(self, nodes, domain=None):
         try:
-            if type(nodes) is not list:
+            if not hasattr(nodes, '__iter__'):
                 nodes = [nodes]
             if domain is not None:
                 return self.pings[(self.pings['prb'].isin(nodes)) & (self.pings['domain'] == domain)]

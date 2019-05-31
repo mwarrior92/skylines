@@ -126,6 +126,7 @@ def plot_geodfm_vs_cnredfm():
 
 def get_domain_alignment(i):
     print('cluster '+str(i))
+    sys.stdout.flush()
     c = g_clusters[i]
     if len(c) < 3:
         return None
@@ -134,7 +135,7 @@ def get_domain_alignment(i):
 
 def plot_domain_alignment():
     all_sets = list()
-    pool = Pool(3)
+    pool = Pool(6)
     for tmp_counts in pool.imap_unordered(get_domain_alignment, range(len(g_clusters))):
         if tmp_counts:
             all_sets.append(tmp_counts)
