@@ -85,7 +85,7 @@ class Nodes(ExperimentData):
                 in self._probes_df.probe])
 
     def attach_pings(self):
-        self.pingdata = skypings.Pings()
+        self.pingdata = skypings.Pings(self.fmt_path('datadir/pings/light_pings.json'))
 
     def get_pings_for_domain(self, nodes, domain):
         if not hasattr(self, 'pingdata'):

@@ -165,7 +165,6 @@ def plot_domain_alignment():
         data = json.load(f)
     doms, aln_devs, perf_devs = zip(*data)
     fig, ax = plt.subplots(figsize=(6,3.5))
-    tmp = [abs(z) for z in aln_devs]
     ecdf = ECDF(aln_devs)
     ax.plot(list(ecdf.x), list(ecdf.y))
     ax.set_xlabel('distance from mean alignment')
@@ -352,9 +351,9 @@ if __name__ == '__main__':
     #plot_geo_centers()
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
         f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
-    #g_scb.nodes.attach_pings()
     '''
     g_ca.scb.nodes.keep_only([])
+    g_ca.scb.nodes.attach_pings()
     plot_domain_alignment()
     '''
     g_ca.scb.nodes.keep_only('coords')

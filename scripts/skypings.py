@@ -18,7 +18,7 @@ class Pings(ExperimentData):
         try:
             if type(nodes) is not list:
                 nodes = [nodes]
-            if domain:
+            if domain is not None:
                 return self.pings[(self.pings['prb'].isin(nodes)) & (self.pings['domain'] == domain)]
             else:
                 return self.pings[self.pings['prb'].isin(nodes)]

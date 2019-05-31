@@ -231,15 +231,12 @@ class ClusterAnalysis(ExperimentData):
                     tests[site] += 1
                     answers[site].add(addr)
         counts = dict()
-        D = DataGetter()
         for i in tests:
             t = float(tests[i])
             if t == 0:
                 continue
             a = float(len(answers[i]))
-            site = D.int2dom(int(i))
-            pings = self.scb.nodes.get_pings_for_domain(cluster,site)
-            print(site)
+            pings = self.scb.nodes.get_pings_for_domain(cluster,i)
             print(pings)
             if len(pings):
                 pings = [np.mean(z) for z in pings.res.to_list() if z]
