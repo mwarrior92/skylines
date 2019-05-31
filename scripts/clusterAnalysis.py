@@ -226,21 +226,21 @@ class ClusterAnalysis(ExperimentData):
         answers = defaultdict(set)
         tests = defaultdict(int)
         for i in cluster:
-            sys.stdout.write('p'+str(i)+',')
-            sys.stdout.flush()
             for site, addrs in self.scb.nodes[i].results.items():
                 for addr in addrs:
                     tests[site] += 1
                     answers[site].add(addr)
         counts = dict()
+        D = DataGetter()
         for i in tests:
-            sys.stdout.write('t'+str(i)+',')
-            sys.stdout.flush()
             t = float(tests[i])
             if t == 0:
                 continue
             a = float(len(answers[i]))
-            pings = self.scb.nodes.get_pings_for_domain(cluster,i)
+            site = D.int2dom(int(i))
+            pings = self.scb.nodes.get_pings_for_domain(cluster,site)
+            print(site)
+            print(pings)
             if len(pings):
                 pings = [np.mean(z) for z in pings.res.to_list() if z]
                 pings = np.median(pings)

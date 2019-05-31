@@ -22,8 +22,7 @@ cluster. Members of a cluster with a larger mean geographic distance are farther
 apart form each other, on average, than are the members of a cluster with a
 lower mean geographic distance. In the median case, we see an average client
 distance of 509 km. We observe that for 20\% of clusters, members are over 1000
-km on average. For perspective, we remind the reader that the circumference of
-the world is approximately 40,075 km. 
+km on average.  
 
 \begin{figure}
     \epsfig{file=figs/geo_means.png, width=1\linewidth}
@@ -59,15 +58,6 @@ is clearly observable.  However, as the geographic distance increases beyond
 1000 km, the directly proportional relationship between performance and center
 distance becomes more apparent. 
 
-We also point out that the slope of Figure \ref{geoperf}'s the
-best line quantifies this relationship approximately
-8.2\texttimes10\textsuperscript{7}m/s, which implies a general data speed of
-$\frac{1}{4}$ of the speed of light. This finding similar that of CITE. In additon, the
-fastest network communication mediums in use at the time of this writing move
-data at approximately $\frac{2}{3}$ of the speed of light CITE. Accounting for
-traffic, routing complexity, and the pressence of lower speed mediums may
-account for our lower finding.
-
 \begin{figure}
     \epsfig{file=figs/geo_vs_perf.png, width=1\linewidth}
     \caption{Scatter plot where, for each client, we compares the client's mean latency
@@ -75,3 +65,88 @@ account for our lower finding.
     center. The line denotes a first order best fit curve for the scatter plot's points.}
     \label{geoperf}
 \end{figure}
+
+We also point out that the slope of Figure \ref{geoperf}'s best fit line
+quantifies this relationship as approximately
+8.2\texttimes10\textsuperscript{7}m/s, which implies a general data speed of
+$\frac{1}{4}$th of the speed of light. This finding is similar that hypothesized
+by CITE. In additon, the fastest network communication mediums in use at the
+time of this writing move data at approximately $\frac{2}{3}$rds of the speed of
+light CITE. Traffic, routing complexity, and the pressence of lower speed
+mediums may account for the apparently lower speed in our finding.
+
+
+\begin{figure}
+    \mbox{
+        \begin{subfigure}[b]{0.5\linewidth}
+            \epsfig{file=figs/nearest_centers_dist.png, width=1\linewidth}
+            \caption{geographic distance}
+            \label{nearest_center_dist}
+        \end{subfigure}
+        \begin{subfigure}[b]{0.5\linewidth}
+            \epsfig{file=figs/nearest_centers_cnre.png, width=1\linewidth}
+            \caption{CNRE similarity}
+            \label{nearest_center_cnre}
+        \end{subfigure}
+    }
+    \caption{Subfigure \ref{nearest_center_dist} shows a scatter plot of each client's geographic distance from its own
+    (``default'') cluster's
+    center location versus its geographic distance to the geographically closest center of
+    another cluster (``closest'').
+    Subfigure \ref{nearest_center_cnre} shows a scatter plot of each client's CNRE similarity with its own
+    (``default'') cluster's
+    center location versus its CNRE similarity with the geographically
+    closest center of
+    another cluster (``closest'').}
+    \label{nearest_centers}
+\end{figure}
+
+As we have demonstrated that one's distance
+from their cluster's center impacts performance, clients should ideally share
+resources with the closest cluster center possible. Figure \ref{geoperf} raises an additional concern: many clients are very far
+away --- often thousdands of kilometers --- from their respective cluster
+centers.  For perspective, we remind the reader that the circumference of the
+world is approximately 40,075 km; several clients reside over a fourth of that
+distance from their cluster's center. With such large geographic distances,
+however, it is likely the case that
+there exists some \emph{alternative} cluster whose center is geographically
+nearer to the client than the client's own cluster's center. For clarity, we
+will refer to a client's own cluster's center as its ``default'' center, and the
+cluster center geographically closest to the client (excluding the ``default''
+center) as the ``closest center'' or ``alternative center''. In Figure
+\ref{nearest_centers}, we compare the properties of each client's default and
+closest centers.
+
+Subfigure \ref{nearest_center_dist} shows a scatter plot of the geographic
+distance from each client (in kilometers) to its default and closest centers.
+The diagonal line dividing the plot indicates where the geographic distances are
+equal.  Points beneath the line correspond to clients who are closer to their
+alternative centers, while clients with points above the line are closest to
+their default centers. Most clients are closer to their alternative centers, but
+there are several details to note, discussed below. 
+
+First, it is apparent that most clients are geograhpically closer to their
+alternative cluster centers than their default centers, in some cases by orders
+of magnitude. Second, we remind the reader that we employed the complete linkage
+method to form our hierarchical clusters. Because of the behavior of complete
+linkage, which determines cluster membership by pairwise distance across all
+members instead of individual members, it is possible that individual clients
+may have a higher CNRE similarity with their alternative center than with their
+default center. In other words, it may be the case that we have assigned some
+clients to the ``wrong'' cluster. Occurrances of this may account for some of
+the noise observed in default center distances below 1000 km in Figure
+\ref{geoperf}. To test for mismatched clients, we plot a point for each client's CNRE similarity
+towards its closest center versus its default center in Subfigure
+\ref{nearest_center_cnre}. The majority of CNRE
+values in Subfigure \ref{nearest_center_cnre} are concentrated between 0.7 and
+0.8. This suggests that geograhpically overlapping resource allocation groups
+may be responsible for the behavior observed in the ambiguous regions of Figures
+\ref{fig:dendrogram} and \ref{fig:vslabel}. 
+
+Although NUM\% of clients had alternative centers geographically closer than
+their default centers (NUM kilometers closer in the median case), NUM\% of these
+clients had higher CNRE similarity with their default centers (NUM\% better in
+the median case). While we have demonstrated that high geographic distance
+coupled with high CNRE tends to result in higher latency, here we paradoxically
+observe that this is arrangement is a common occurence. We further explore the
+implications of this pattern in Section \ref{discussion}.

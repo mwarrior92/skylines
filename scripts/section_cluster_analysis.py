@@ -133,7 +133,6 @@ def get_domain_alignment(i):
 
 
 def plot_domain_alignment():
-    counts = defaultdict(list)
     all_sets = list()
     pool = Pool(3)
     for tmp_counts in pool.imap_unordered(get_domain_alignment, range(len(g_clusters))):
@@ -161,22 +160,27 @@ def plot_domain_alignment():
                 perf - mean_perf if mean_perf and perf else None))
     with open(g_ca.fmt_path('datadir/domain_alignment/deviations.json'),'w') as f:
         json.dump(data,f)
+    D = DataGetter()
+    with open(D.fmt_path('datadir/domain_alignment/deviations.json'),'r') as f:
+        data = json.load(f)
     doms, aln_devs, perf_devs = zip(*data)
     fig, ax = plt.subplots(figsize=(6,3.5))
+    tmp = [abs(z) for z in aln_devs]
     ecdf = ECDF(aln_devs)
     ax.plot(list(ecdf.x), list(ecdf.y))
     ax.set_xlabel('distance from mean alignment')
     ax.set_ylabel('CDF')
-    fig.savefig(g_ca.fmt_path('plotsdir/domain_alignment/alignment.png'))
+    fig.savefig(D.fmt_path('plotsdir/domain_alignment/alignment.png'))
     plt.close(fig)
-    fig, ax = plt.subplots(figsize=(6,6))
-    heatmap, x, y = np.histogram2d(aln_devs,perf_devs,bins=50, range=[rng,rng])
+    fig, ax = plt.subplots(figsize=(4.5,4.5))
+    aln_devs, perf_devs = zip(*[z for z in zip(aln_devs, perf_devs) if z[1]])
+    heatmap, x, y = np.histogram2d(aln_devs,perf_devs,bins=50)
     extent = [x[0], x[-1], y[0], y[-1]]
     pos = ax.imshow(heatmap.T, extent=extent, origin='lower', cmap='Greys')
     fig.colorbar(pos)
     ax.set_xlabel('distance from mean alignment')
     ax.set_ylabel('distance from mean performance')
-    fig.savefig(g_ca.fmt_path('plotsdir/domain_alignment/align_vs_perf.png'))
+    fig.savefig(D.fmt_path('plotsdir/domain_alignment/align_vs_perf.png'))
     plt.close(fig)
 
 
@@ -299,19 +303,23 @@ def plot_nearest_centers():
     #rng = [minlim, maxlim]
     #heatmap, x, y = np.histogram2d(x,y,bins=100, range=[rng,rng])
     #extent = [x[0], x[-1], y[0], y[-1]]
-    fig, ax = plt.subplots(figsize=(6,6))
+    fig, ax = plt.subplots(figsize=(4,6))
     ax.scatter(x,y, alpha=0.1)
-    minlim = min([ax.get_xlim()[0], ax.get_ylim()[0]])
-    maxlim = max([ax.get_xlim()[1], ax.get_ylim()[1]])
+    #minlim = min([ax.get_xlim()[0], ax.get_ylim()[0]])
+    #maxlim = max([ax.get_xlim()[1], ax.get_ylim()[1]])
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
     #pos = ax.imshow(heatmap.T, extent=extent, origin='lower', cmap='Greys')
     #fig.colorbar(pos)
     ax.set_xlabel('CNRE with default center')
     ax.set_ylabel('CNRE with closest center')
-    ax.plot([minlim,maxlim],[minlim, maxlim], 'r')
+    ax.plot([0,1],[0, 1], 'r')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
     fig.savefig(D.fmt_path('plotsdir/nearest_centers_cnre.png'))
     plt.close(fig)
     x,y = zip(*dists)
-    fig, ax = plt.subplots(figsize=(6,6))
+    fig, ax = plt.subplots(figsize=(4.5,4.5))
     ax.scatter(x,y, alpha=0.1)
     ax.set_xlabel('km to default center')
     ax.set_ylabel('km to closest center')
@@ -324,6 +332,7 @@ def plot_nearest_centers():
     ax.plot([minlim,maxlim],[minlim,maxlim], 'r')
     fig.savefig(D.fmt_path('plotsdir/nearest_centers_dist.png'))
     plt.close(fig)
+
 
 if __name__ == '__main__':
     global g_scb
@@ -354,4 +363,5 @@ if __name__ == '__main__':
     g_clusters = {i: g_clusters[i] for i in range(len(g_clusters)) if len(g_clusters[i]) > 2}
     get_nearest_centers(2)
     plot_nearest_centers()
+    plot_domain_alignment()
     '''
