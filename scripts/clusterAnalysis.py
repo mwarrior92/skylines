@@ -188,10 +188,24 @@ class ClusterAnalysis(ExperimentData):
         mean = np.mean(list(inner.values()))
         return mean
 
-    def get_geo_center(self, inner):
-        mean = np.mean(list(inner.values()))
-        center = sorted(list(inner.keys()), key=lambda z: abs(inner[z]-mean))[0]
-        return self.scb.nodes[center]
+    def get_geo_center(self, cluster):
+        dists = defaultdict(list)
+        nodes = list()
+        for z in cluster:
+            coords = self.scb.nodes[z].coords
+            if not coords or not coords[0]:
+                continue
+            else:
+                coords = coords[0][1], coords[0][0]
+            nodes.append((z,coords))
+        for (i,a),(j,b) in itertools.combinations(nodes, 2):
+            d = vincenty(a, b).km
+            dists[i].append(d)
+            dists[j].append(d)
+        for i in dists:
+            dists[i] = sum(dists[i])
+        center = sorted(list(dists.keys()), key=lambda z: dists[z])[0]
+        return center
 
     def get_dists_from_geo_center(self, cluster):
         dists = defaultdict(list)

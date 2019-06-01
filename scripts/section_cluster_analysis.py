@@ -134,6 +134,7 @@ def get_domain_alignment(i):
 
 
 def plot_domain_alignment():
+    '''
     all_sets = list()
     pool = Pool(6)
     for tmp_counts in pool.imap_unordered(get_domain_alignment, range(len(g_clusters))):
@@ -161,8 +162,10 @@ def plot_domain_alignment():
                 perf - mean_perf if mean_perf and perf else None))
     with open(g_ca.fmt_path('datadir/domain_alignment/deviations.json'),'w') as f:
         json.dump(data,f)
+    '''
     D = DataGetter()
-    with open(D.fmt_path('datadir/domain_alignment/deviations.json'),'r') as f:
+    #with open(D.fmt_path('datadir/domain_alignment/deviations.json'),'r') as f:
+    with open(D.fmt_path('datadir/deviations.json'),'r') as f:
         data = json.load(f)
     doms, aln_devs, perf_devs = zip(*data)
     fig, ax = plt.subplots(figsize=(6,3.5))
@@ -173,10 +176,10 @@ def plot_domain_alignment():
     fig.savefig(D.fmt_path('plotsdir/domain_alignment/alignment.png'))
     plt.close(fig)
     fig, ax = plt.subplots(figsize=(4.5,4.5))
-    aln_devs, perf_devs = zip(*[z for z in zip(aln_devs, perf_devs) if z[1]])
+    aln_devs, perf_devs = zip(*[z for z in zip(aln_devs, perf_devs) if z[1] is not None])
     heatmap, x, y = np.histogram2d(aln_devs,perf_devs,bins=50)
     extent = [x[0], x[-1], y[0], y[-1]]
-    pos = ax.imshow(heatmap.T, extent=extent, origin='lower', cmap='Greys')
+    pos = ax.imshow(heatmap.T, extent=extent, origin='lower', cmap='Greys', aspect='auto')
     fig.colorbar(pos)
     ax.set_xlabel('distance from mean alignment')
     ax.set_ylabel('distance from mean performance')
@@ -334,6 +337,44 @@ def plot_nearest_centers():
     plt.close(fig)
 
 
+def get_bad_outliers(i):
+    cluster = g_clusters[i]
+    center = g_ca.get_geo_center(cluster)
+    perf = g_ca.scb.nodes.to_pings(cluster)
+    q1 = np.percentile(perf, 25)
+    q3 = np.percentile(perf, 75)
+    iqr = q3 - q1
+    outliers = list()
+    for i in range(len(perf)):
+        p = perf[i]
+        c = cluster[i]
+        if p > q3+iqr:
+            cnre = 1.0 - g_ca.scb.cnre(c, center)
+            outliers.append((c, p, cnre))
+    return outliers
+
+
+def plot_outlier_clients():
+    pool = Pool(8)
+    outliers = list()
+    for i, onodes in pool.imap_unordered(get_the_center, g_clusters.keys()):
+        if onodes:
+            outliers.append(onodes)
+    with open(g_ca.fmt_path('datadir/outlier_nodes/raw.json'),'w') as f:
+        json.dump(outliers, f)
+    nodes, perfs, cnres = zip(*outliers)
+    geometry = [Point(*reversed(z)) for z in g_ca.scb.nodes.to_coords(nodes)]
+    world = gp.read_file(gp.datasets.get_path('naturalearth_lowres'))
+    world = world[(world.pop_est>0) & (world.name!="Antarctica")]
+    fig, ax = plt.subplots(figsize=(15,15))
+    world.plot(edgecolor='gray', ax=ax)
+    gdf = gp.GeoDataFrame(geometry=list(geometry))
+    gdf.plot(ax=ax, markersize=10, c=cnres, cmap='Reds')
+    fig.savefig(g_ca.fmt_path('plotsdir/outlier_nodes.png'))
+    plt.close(fig)
+
+
+
 if __name__ == '__main__':
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder()
@@ -344,6 +385,10 @@ if __name__ == '__main__':
     #g_scb.nodes.load_pings()
     g_ca = ClusterAnalysis(scb=g_scb)
     g_clusters = g_ca.grouped_clusters(threshold=1.0-0.73)
+    g_clusters = {i: g_clusters[i] for i in range(len(g_clusters)) if len(g_clusters[i]) > 2}
+    g_ca.scb.nodes.keep_only(['coords'])
+    g_ca.scb.nodes.load_ping_means()
+    plot_outlier_clients()
     '''
     #with open(g_ca.fmt_path('datadir/g_clusters.json'),'w') as f:
     #    json.dump([list(z) for z in g_clusters],f)
@@ -352,11 +397,9 @@ if __name__ == '__main__':
     #plot_geo_centers()
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
         f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
-    '''
     g_ca.scb.nodes.keep_only([])
     g_ca.scb.nodes.attach_pings()
     plot_domain_alignment()
-    '''
     g_ca.scb.nodes.keep_only('coords')
     with open(g_scb.fmt_path('datadir/g_clusters.json'),'r') as f:
         g_clusters = json.load(f)

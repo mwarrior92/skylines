@@ -54,3 +54,9 @@ class Pings(ExperimentData):
                 np.std(pings),
                 len(pings)
                 )
+
+    def get_ping_mean(self, *args, **kwargs):
+        pings = self.get_flat_pings(*args, **kwargs)
+        if not pings:
+            return -1
+        return np.mean(pings)

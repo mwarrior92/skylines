@@ -84,6 +84,11 @@ class Nodes(ExperimentData):
         self._probes_df = self._probes_df.assign(pings=[p.get_ping_stats(z) for z \
                 in self._probes_df.probe])
 
+    def load_ping_means(self):
+        p = skypings.Pings()
+        self._probes_df = self._probes_df.assign(pings=[p.get_ping_mean(z) for z \
+                in self._probes_df.probe])
+
     def attach_pings(self):
         self.pingdata = skypings.Pings(self.fmt_path('datadir/pings/light_pings.json'))
 
