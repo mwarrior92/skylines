@@ -110,7 +110,7 @@ def plot_geo_centers():
     fig, ax = plt.subplots(figsize=(15,15))
     world.plot(edgecolor='gray', ax=ax)
     gdf = gp.GeoDataFrame(geometry=list(geometry))
-    gdf.plot(ax=ax, markersize=5, color='yellow')
+    gdf.plot(ax=ax, markersize=5, color='#00FF00')
     fig.savefig(D.fmt_path('plotsdir/geo_centers.png'))
     plt.close(fig)
 
@@ -338,26 +338,31 @@ def plot_nearest_centers():
 
 
 def get_bad_outliers(i):
-    cluster = g_clusters[i]
-    center = g_ca.get_geo_center(cluster)
-    perf = g_ca.scb.nodes.to_pings(cluster)
-    q1 = np.percentile(perf, 25)
-    q3 = np.percentile(perf, 75)
-    iqr = q3 - q1
+    print(i)
     outliers = list()
-    for i in range(len(perf)):
-        p = perf[i]
-        c = cluster[i]
-        if p > q3+iqr:
-            cnre = 1.0 - g_ca.scb.cnre(c, center)
-            outliers.append((c, p, cnre))
-    return outliers
+    try:
+        cluster = g_clusters[i]
+        center = g_ca.get_geo_center(cluster)
+        perf = g_ca.scb.nodes.to_pings(cluster)
+        q1 = np.percentile(perf, 25)
+        q3 = np.percentile(perf, 75)
+        iqr = q3 - q1
+        for i in range(len(perf)):
+            p = perf[i]
+            c = cluster[i]
+            if p > q3+iqr:
+                cnre = 1.0 - g_ca.scb.cnre(c, center)
+                outliers.append((c, p, cnre))
+    except Exception as e:
+        traceback.print_exception(*sys.exc_info())
+        raise e
+    return i, outliers
 
 
 def plot_outlier_clients():
     pool = Pool(8)
     outliers = list()
-    for i, onodes in pool.imap_unordered(get_the_center, g_clusters.keys()):
+    for i, onodes in pool.imap_unordered(get_bad_outliers, g_clusters.keys()):
         if onodes:
             outliers.append(onodes)
     with open(g_ca.fmt_path('datadir/outlier_nodes/raw.json'),'w') as f:
@@ -373,9 +378,17 @@ def plot_outlier_clients():
     fig.savefig(g_ca.fmt_path('plotsdir/outlier_nodes.png'))
     plt.close(fig)
 
+'''
+def domain_count_accuracy(n):
+    scb0 = SkyClusterBuilder(limit=500)
+    scb1.make_closeness_matrix_capped(n)
+'''
+
+
 
 
 if __name__ == '__main__':
+    '''
     global g_scb
     g_scb = skyclusters.SkyClusterBuilder()
     g_scb.load_matrix_from_file('datadir/matrix/matrix.json')
@@ -389,12 +402,10 @@ if __name__ == '__main__':
     g_ca.scb.nodes.keep_only(['coords'])
     g_ca.scb.nodes.load_ping_means()
     plot_outlier_clients()
-    '''
     #with open(g_ca.fmt_path('datadir/g_clusters.json'),'w') as f:
     #    json.dump([list(z) for z in g_clusters],f)
     #plot_perf_vs_geo(2)
     #plot_geo_mean(2)
-    #plot_geo_centers()
     with open(g_ca.fmt_path('datadir/nclusters.txt'),'w') as f:
         f.write(str([len(g_clusters), np.median([len(z) for z in g_clusters])]))
     g_ca.scb.nodes.keep_only([])
@@ -408,3 +419,4 @@ if __name__ == '__main__':
     plot_nearest_centers()
     plot_domain_alignment()
     '''
+    plot_geo_centers()
