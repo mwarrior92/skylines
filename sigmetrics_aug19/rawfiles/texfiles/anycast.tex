@@ -1,0 +1,16 @@
+\subsection{Anycast}
+\label{anycast}
+
+We opted for this project, as the first ever exploration of aggregate content
+resource catchments, to focus on naturally occuring diversity in DNS redirection
+across domains and clients. However, many large Internet platforms, although
+serving from globally distributed points of presence, operate with as few as one
+primary public IP address for all clients, regardless of the client's location
+by employing \emph{anycast} techniques as opposed to DNS redirection for
+server-to-client mapping \cite{Katabi:2000:FSG:347059.347388}. In anycast, a provider will advertise
+different BGP route announcements for the same IP address in different regions.
+While, in its current implementation, CNRE is dependent on differing DNS
+answers, it is in some cases possible to distinguish differing anycast hosts
+independently of their IP address \cite{anycast,fan2013evaluating,boothe2005dns}. With this approach, it would be trivial
+to treat distinct anycast destinations in the same way as distinct IP answers,
+enabling them to be incorporated into CNRE's calculation.

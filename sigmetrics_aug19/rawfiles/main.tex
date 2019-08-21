@@ -1,0 +1,69 @@
+\documentclass[10pt,sigconf,letterpaper,anonymous]{acmart}
+
+\usepackage[english]{babel}
+\usepackage{blindtext}
+\usepackage{booktabs} % For formal tables
+\usepackage{epsfig,endnotes,subcaption,url}
+% Copyright
+\renewcommand\footnotetextcopyrightpermission[1]{} % removes footnote with conference info
+\setcopyright{none}
+\settopmatter{printacmref=false, printccs=false, printfolios=true}
+
+% DOI
+\acmDOI{}
+
+% ISBN
+\acmISBN{}
+
+%Conference
+%\acmConference[Submitted for review to SIGCOMM]{}
+%\acmYear{2018}
+%\copyrightyear{}
+
+%% {} with no args suppresses printing of the price
+\acmPrice{}
+
+\newcommand{\RF}[1]{{\bf\color{orange}(Romain) #1}}
+
+
+\begin{document}
+\acmConference[SIGMETRICS'20]{SIGMETRICS 2020}{June 2020}{XX, YY}
+\title[Skylines]{Skylines: Demystifying Network Resource Islands with Virtual Landmarks}
+
+%
+% I use a file for every section.  Each of these corresponds to a file
+% with the specified name ending in '.tex' (e.g., introduction.tex).
+%
+
+%   ==========================================================================
+%   AUTHORS
+%   ==========================================================================
+%    \input{texfiles/authors}
+%   ==========================================================================
+%   ABSTRACT
+%   ==========================================================================
+    \input{texfiles/abstract}
+    \maketitle
+%   ==========================================================================
+    %   IMC generated code (document details)
+%   ==========================================================================
+    \input{texfiles/gencode}
+%   ==========================================================================
+%   MAIN PAPER BODY
+%   ==========================================================================
+    \input{texfiles/introduction}
+    \input{texfiles/exp_overview}
+    \input{texfiles/cnre.tex}
+    \input{texfiles/findingclusters.tex}
+    \input{texfiles/clusteranalysis.tex}
+    \input{texfiles/discussion.tex}
+    \input{texfiles/conclusion}
+%   ==========================================================================
+%   Wrap up the document with the Bibliography (looks for the specified .bib)
+%   ==========================================================================
+    \clearpage
+
+    \bibliographystyle{ACM-Reference-Format}
+    %\bibliography{skylines} 
+    \bibliography{bibliography} 
+\end{document}

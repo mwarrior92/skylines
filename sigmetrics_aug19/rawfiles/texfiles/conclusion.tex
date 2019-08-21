@@ -1,0 +1,18 @@
+\section{Summary}
+
+In this paper, we performed a large scale analysis of cross-domain DNS
+redirection for 9,024 globally distributed clients. Our experiments spanned 
+302 content hosting domains, shown to often coexist within the same popular web pages.
+To quantify our findings, we introduced common network resource exposure, a
+similarity measure that captures the extent to which clients are directed to the
+same content resources. We validated CNRE as a necessary new measure by formally demonstrating that existing alternative labeling schemes fail to adequately
+capture the same information.
+
+Having established CNRE, we investigated the properties of high and low CNRE
+measures between clients, and, from our findings, we derive CNRE \emph{clusters},
+representative of aggregate content resource catchments. Finally, we have shown that a
+client's geogrpahic relationship with its cluster's center is directly
+proportional to that client's average performance across hundreds of domains. In
+summary, our work in this project provides a baseline by which we can better
+understand content resource allocation patterns, independent of the case specific
+concerns of individual hosting implementations.

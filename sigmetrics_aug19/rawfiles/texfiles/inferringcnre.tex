@@ -1,0 +1,20 @@
+\subsection{Inferring CNRE}
+
+As number of measurements and calculations performed for a group of clients may
+group potentially large, there may be beneficial tradeoffs for modified
+techniques designed to lighten the imposed load. The most accessible
+``lightened'' approach may be to exploit the associative properties of CNRE
+observed across a set of clients. The
+pattern seen in Figure \ref{fig:cnredist} is a byproduct of this associative
+behavior.  Pairs of clients with high CNRE similarity
+will likely have similar relationships (relative to each other) with other
+clients. For example, suppose that clients $A$ and $B$ have \emph{high} CNRE
+similarity, and clients $B$ and $C$ have CNRE similarity of $s$. Let us refer to
+the CNRE similarity between $A$ and $C$ as $s'$. Given the nature of how CNRE is
+obtained, it is very likely the case that $s$ and $s'$ are very close in value.
+We can therefore reasonably \emph{approximate} $s'$ using $s$ in scenarios where
+we wish to perform significantly less than $O(wn^2)$ measurements, where $w$ is the
+number of sites being tested and $n$ is the number of clients. The magnitude of
+loss in accuracy will depend on the threshold at which the experimenter
+considers the CNRE between a pair of clients sufficiently high to equate said
+clients for remaining CNRE calculations. 

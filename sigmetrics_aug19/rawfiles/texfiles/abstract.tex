@@ -1,0 +1,29 @@
+\begin{abstract}
+
+``Do you see what I see?'' The vastness of today's Internet creates an intuitive
+but often overlooked phenomenon: not everyone is exposed to the same web
+resources. Even across the set of objects embedded in a single web page, a pair of
+clients with apparently similar network properties may be assigned to barely
+overlapping sets of network resources to pull from. While the properties of
+individual content distribution networks (CDNs) and the like are well explored,
+there has been, until now, a lack of insight regarding the \emph{aggregate}
+behavior of these many large networks co-existing.  
+
+In this paper, we perform the first, deep analysis of cross-provider resource
+allocation patterns and the resulting aggregate mapping of over 10,000 RIPE
+Atlas clients around the world. To facilitate our research, we introduce common
+network resource exposure (CNRE) - a measure of the degree to which a pair of
+clients are exposed to the same network destinations as each other across a
+large set of domains. We explore the implications of high and low CNRE scores,
+and assess the relationship between CNRE and well established network properties (country,
+ASN, and BGP prefix). 
+    
+By clustering clients that share high CNRE measures, we identify aggregate
+    catchment patterns encompassing 302 popular domains. Our findings expose clients that
+are poorly served by their current position in this aggregate mapping scheme and
+show that a client's distance from the geographic center of their CNRE cluster is
+directly proportional to the latency they experience across providers.
+
+\end{abstract}
+
+
