@@ -58,8 +58,6 @@ domain set from 10,000 pages to 2,441 pages. For each of these pages, an HTTP
 archive (HAR) file was saved to capture the full set of web objects loaded with
 the page. By using HAR files instead of just the page source, we avoid missing
 any dynamically loaded objects that may not appear in the original source. 
-%Even after using this approach, the space of possible domains remains larger
-%than I can address in the scope of this experiment.
 The HAR file provides the full HTTP path of each web object retrieved. Domains
 used in the remainder of this project come from this resulting dataset. 
 
@@ -68,7 +66,7 @@ Due to security related rate limits, our experiment's progression was capped to
 number of domains to be used in the experiment. Since the entire domain set obtained
 was larger than what we could reasonably cover, we \emph{ranked} object hosting domains by how frequently they were
 observed across the set of HAR files. The most frequently appearing object
-hosting domains were given priority.  Based on this prioritization, I
+hosting domains were given priority.  Based on this prioritization, we
 arbitrarily used the top 304 domains from this set. 
 
 \begin{figure}
