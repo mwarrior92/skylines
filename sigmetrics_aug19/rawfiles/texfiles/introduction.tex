@@ -88,10 +88,27 @@ This project makes the following contributions:
 \end{itemize}
 
 % RELATED WORK and PROBLEM FRAMING
-\section{Problem Space and Related Work} \label{skyspace}
+\section{Problem Space} \label{skyspace}
 
-This projects aims to gain an understanding of which clients are directed to the same set of
-resources across many distinct domains. Its most direct and immediate use case is influencing probe
+In this paper, we aim to quantify the degree of overlap in the sets of network
+resources (\emph{i.e.} servers) that different clients are exposed to when
+browsing the same websites. We further aim to assess the implications of this
+overlap and derive the effective aggregated hubs of these resource sets. This endeavor is chiefly motivated by two key
+observations. First, it is well documented that web services rarely operate in
+isolation, but rather in (potentially large) combinations. Past work found that the
+majority of popular websites: 1) point to web content stemming from \emph{at least}
+7 distinct origins~\cite{butkiewicz2011} and 2) trigger upwards of 50 DNS
+resolutions for a single client~\cite{dnssly}. Second, as discussed in
+Section \ref{sect:intro} and illustrated by Figure \ref{fig:dnsmiss}, it is well
+established that DNS answers often vary across clients, even for a single domain
+\cite{ecs15sigcomm,Calder2013,benchaita2016stability,exploringedns,warrior2017drongo}.
+Below, we detail the anticipated applications for this work and discuss related
+research to provide the reader with necessary context through which the rest of
+this paper can be understood.
+
+\subsection{Applicability} \label{applicability}
+
+This work's most direct and immediate use case lies in influencing client
 selection in large scale Internet measurements. For researchers, likely unaware of the relatively
 hidden allocation schemes of the wide array of CDN platforms and other large content distributors,
 it is difficult to determine, a priori, the degree of similarity between clients. Knowledge of
@@ -103,6 +120,23 @@ an exhaustive set of tags on all of their clients in order to help researchers a
 filter and refine the set selected for their experiment \cite{ripe-atlas}. Further, more abstract
 applications may include, but are not limited to, distributed denial of service mitigation
 \cite{anycastvsddos} and CDN node deployment \cite{35590, Tariq}.
+
+In addition to the above applications in currently existing paradigms, we also
+speculate a significant potential use case for the techniques discussed in this
+paper. For a variety of reasons --- most notably, security concerns ---
+providers (\emph{i.e.} CDNs and other content hosting platforms) often deem it
+within their best interest to limit public visibility into the details of the
+respective platform's infrastructure and implementation scheme (\emph{e.g.} the
+exact locations, IP ranges, or client mappings of all of their servers or
+datacenters). The approach and findings presented Section \ref{sect:analysis}
+offer a means to effectively capture the \emph{properties} --- geographic
+resource locations, number of resource locations, performance, etc --- of these
+providers while \emph{obfuscating} the specifics of any individual provider
+behind aggregated hubs we refer to as geographic ``centers''. In other
+words, our approach may offer the opportunity for openness and collaboration in a
+space that is otherwise kept deliberately opaque.
+
+\subsection{Related Work} \label{related}
 
 The most similar body of related work involves anycast CDN catchment analysis, which aims to
 investigate the set of clients routed towards particular CDN points of presence (PoPs)

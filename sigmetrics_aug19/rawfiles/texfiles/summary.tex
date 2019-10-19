@@ -1,11 +1,49 @@
 % SUMMARY
-\subsection{Summary}
+\subsection{Conlcusion}
 
-Although many naming conventions are in place, none directly indicate the amount of shared resources
-between clients, and it is often taken for granted what clients sharing some label will have in
-common. In this project, we measure the extent to which these conventions actually align with
-careless assumptions regarding web resource allocation. We perform over 52 million comparisons
-across more than 10,000 clients, and base our experiment in the context of real resolution sets
-associated with popular webpages. Our preliminary findings show that the relationship between
-existing grouping schemes and network resource exposure is nonintuitive, and that a new, direct
-approach --- which we have coined the ``Skyline model" --- would help to resolve this. 
+As a byproduct of the growing levels of complexity and abstraction in today's
+Internet, it is often taken for granted what clients sharing some labels or
+properties will have in common. In this paper, we measured the extent to which
+clients accessing the same websites share web resources. We performed over 52
+million comparisons across more than 9,000 clients, and based our experiment in
+the context of real resolution sets associated with popular webpages. To
+faciliate our analysis, we introduced common network resource exposure (CNRE),
+which quantifies the degree of overlap between the sets of network resources
+observed by a pair of clients. We contextualized CNRE with respect to network
+performance and existing client labeling conventions: BGP prefix, ASN, and
+country. Our findings formally demonstrate that use of these existing labeling
+schemes, in alternative to CNRE, fail to adequately capture the same
+information.
+
+Through CNRE, we were able to cluster clients by similarity and analyze 
+relationships between members of the same cluster. We further identified each
+cluster's
+effective geographic center, each individually representative of the hundreds
+of domains and thousands of measurements from which they were derived. Finally,
+we validated geographic centers by observing a directly proportional
+relationship between a client's distance from its cluster's center and the
+client's average latency toward providers. The software tools used to obtain
+CNRE scores, cluster clients by CNRE, and determine a cluster's geographic
+center are freely availble to the reader as an open source toolset. Together,
+the techniques presented in this paper --- which we collectively refer to as the
+``Skyline model'' --- offer a powerful paradigm through which we can better
+understand network resource allocation and performance patterns. 
+
+
+
+In this paper, we performed a large scale analysis of cross-domain DNS
+redirection for 9,024 globally distributed clients. Our experiments spanned 
+302 content hosting domains, shown to often coexist within the same popular web pages.
+To quantify our findings, we introduced common network resource exposure, a
+similarity measure that captures the extent to which clients are directed to the
+same content resources. We validated CNRE as a necessary new measure by formally demonstrating that existing alternative labeling schemes fail to adequately
+capture the same information.
+
+Having established CNRE, we investigated the properties of high and low CNRE
+measures between clients, and, from our findings, we derive CNRE \emph{clusters},
+representative of aggregate content resource catchments. Finally, we have shown that a
+client's geogrpahic relationship with its cluster's center is directly
+proportional to that client's average performance across hundreds of domains. In
+summary, our work in this project provides a baseline by which we can better
+understand content resource allocation patterns, independent of the case specific
+concerns of individual hosting implementations.
