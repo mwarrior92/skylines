@@ -83,13 +83,13 @@ is marked on each plot by a vertical red line; at this point,
 differing and matching labels become distinguishable. For example, in Figure
 \ref{fig:vasn}, a pair of clients with CNRE $< 0.73$ (see 0.27 in
 Figure \ref{fig:dendrogram}, which uses CNRE distance) are likely from different
-ASes, while clients with CNRE $> 0.73$ are likely from the AS. Note, however, that
-\ref{fig:vslabel} uses \emph{median} values for all points shown. We analyze
+ASes, while clients with CNRE $> 0.73$ are likely from the same AS. Note, however, that
+Figure \ref{fig:vslabel} uses \emph{median} values for all points shown. We analyze
 this further in \ref{s:labelalgn}. 
 
 
 Figures \ref{fig:vslabel} and \ref{fig:cnredist} together help provide a possible
-explanation for three partiions observed in Figure \ref{fig:dendrogram}. In
+explanation for three partions observed in Figure \ref{fig:dendrogram}. In
 Figure \ref{fig:vslabel}, we see that in all three subplots, the aforementioned
 middle region of Figure \ref{fig:dendrogram} appears again, this time as a
 plateau in both the ``Diff'' and ``Same'' curves. In this region, ``Diff'' and
@@ -135,10 +135,10 @@ and arbitrarily complex. Therefore, we treat this subsection as a means of
 validating and justifying the CNRE as a separate, currently unaddressed concept.
 
 In Figure \ref{fig:ch}, we plot the completeness, homogeneity, and number of
-clustesr for the aforementioned labeling schemes as we cluster clients in the
+clusters for the aforementioned labeling schemes as we cluster clients in the
 dataset, varying the CNRE distance threshold used for cluster formation. In
 addition, we also mark, with a vertical line, the CNRE distance at which labels
-become distinct (see Figure \ref{s:formation}), and we mark the number of labels
+become distinct (see Section \ref{s:formation}), and we mark the number of labels
 (\emph{i.e.}, the number countries, ASes, or BGP prefixes) present with a
 horizontal line (using the righthand y-axis). 
 
@@ -147,7 +147,31 @@ membership aligns with a given labeling scheme, is not high, the CNRE-related
 implications of a given label become ambiguous. We see in Figure \ref{fig:ch}
 that for country and ASN, homogeneity and completeness are never simultaneously
 high, rendering them unusable for determining CNRE on their own. BGP prefix,
-however, requires more thorough consideration. In Figure \ref{fig:chbgp}
+however, requires more thorough consideration. 
+
+
+In Figure \ref{fig:chbgp}, where we plot clustering statistics with respect to
+BGP prefix, we see completeness is quite high (upwards of 0.9) for all
+clustering thresholds. This stems partially from properties of our dataset: the
+RIPE Atlas platform aims for breadth and coverage in its distribution of probes,
+prioritizing the addition of probes to previously uncovered subnets over the
+addition of probes to already covered subnets. As a result of this, the sheer
+number of probes per BGP prefix in our data is small --- hence the number of
+different BGP prefixes covered being in the same order of magnitude as the
+total number number of probes, as shown in the figure --- which in turn results
+in higher completeness scores. 
+
+Regardless of the aforementioned technicality, one may still be inclined to
+argue that BGP prefix would suffice in lieu of CNRE. However, further
+observation reveals that in many ways, BGP prefix falls short of providing the
+information gained through CNRE calculations. Most notably, the relationships
+across clients in \emph{different} BGP prefixes is lost entirely. Without
+ultimately resorting to some equivalent to CNRE caluations, it is impossible to
+know which prefixes effectively have ``similar'' clients with regard to network
+resource exposure. This goes against the intended use cases for CNRE, discussed
+in Section \ref{applicability}, where a \emph{range} of similarity values is
+desirable over a strictly boolean comparison. Similarity ranges allow for
+arbitrary levels of granularity when grouping clients.
 
 \begin{figure}
     \center
@@ -173,26 +197,3 @@ however, requires more thorough consideration. In Figure \ref{fig:chbgp}
     \label{fig:ch}
 \end{figure}
 
-
-Figure \ref{fig:dendrogram} depicts the hierarchical clustering dendrogram based 
-on pairwise CNRE distances.
-This representation highlights the similarity of clients and different possible 
-partitioning.
-Each node in the tree is a cluster composed of the underneath denser clusters.
-A horizontal cut in the dendrogram produces a partitioning of clients  for which
-the dissimilarity of two probes in the same partition is not greater than the 
-y-value where the cut is done. 
-
-For example, the colored clusters in Figure~\ref{fig:dendrogram} are obtained 
-with a cut at $y=0.65$.
-This partitioning produces eight clusters including three small ones 
-composed of outliers.
-The five large clusters represent a very coarse partitioning of clients.
-95\% of probes in the green cluster are from Europe and 4\% are from Africa 
-(that is almost all African probes), the red cluster consists mainly of
-German, Italian, and Russian probes (79\%), the blue cluster is mainly North and
-South American probes (resp. 80\% and 18\%), the khaki cluster has mostly probes
-from Asia and Oceania (resp. 67\% and 32\%), and the black cluster is mostly
-North American probes (98\%).
-As each cluster is composed of smaller and denser clusters, one can again partition
-these clusters and form groups with clients having more network resources in common.

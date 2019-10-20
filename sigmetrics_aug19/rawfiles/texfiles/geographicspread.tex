@@ -8,7 +8,7 @@ to the same network resource are physically ``far'' apart from each other, it is
 likewise impossible for \emph{both} clients to simultaneously be near said
 resource. In such an arrangement, the resource is either near one client and far from the other, or the
 resource is equidistant from both clients. In the latter case, if the clients
-are sufficiently far from each other, the resource must also far from both clients.
+are sufficiently far from each other, the resource must also be far from both clients.
 
 To calculate these geographic distances, we use coordinates for RIPE Atlas
 probes --- our client machines in the context of this experiment --- obtained
@@ -17,7 +17,7 @@ from volunteers who themselves maintain Atlas probes, and, where necessary, by
 autmated input from MaxMind \cite{maxmind}. Figure \ref{geomeans} shows the CDF of the
 mean geographic distance (in kilometers) between members of a cluster, for each
 cluster. Members of a cluster with a larger mean geographic distance are farther
-apart form each other, on average, than are the members of a cluster with a
+apart from each other, on average, than are the members of a cluster with a
 lower mean geographic distance. In the median case, we see an average client
 distance of 509 km. We observe that for 20\% of clusters, members are over 1000
 km on average.  
@@ -157,5 +157,5 @@ these geographically closer
 clients had higher CNRE similarity with their default centers (1.99\% higher in
 the median case). While we have demonstrated that high geographic distance
 coupled with high CNRE tends to result in higher latency, here we paradoxically
-observe that this is arrangement is a common occurence. we further explore the
+observe that this arrangement is a common occurence. We further explore the
 implications of this pattern in Section \ref{discussion}.

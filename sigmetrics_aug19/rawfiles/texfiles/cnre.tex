@@ -21,11 +21,11 @@ In other words, $r_{n_i}$ captures the
 \emph{rarity} of the DNS answer received by client $C_n$ for domain $i$.
 
 In our calculation of CNRE, we use the inverse of $r_{n_i}$ to add increased
-weight to the impact of a mismatch on rare answers. CNRE is therefore designed
+weight to the impact of a match on rare answers. CNRE is therefore designed
 to be higher between clients with more matching rare answers. As it is
 ultimately a measure of similarity between clients, CNRE values range from 0
 through 1, with 1 being the most similar. To ease discussion in the remainder of
-this project, here we also define CNRE \emph{distance} as \(1 - \). Likewise, where
+this project, here we also define CNRE \emph{distance} as \(1 - \)CNRE. Likewise, where
 ambiguity is likely, we will refer to raw CNRE as CNRE \emph{similarity}. 
 
 \begin{figure}

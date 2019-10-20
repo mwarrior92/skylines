@@ -84,7 +84,7 @@ arbitrarily used the top 304 domains from this set.
     \label{fig:linkscovered}
 \end{figure}
 
-In Figues \ref{fig:sitescovered} and \ref{fig:linkscovered}, we show the
+In Figures \ref{fig:sitescovered} and \ref{fig:linkscovered}, we show the
 decreasing marginal impact of each additional domain in the set. As shown, both
 quantities --- the number of visited pages including a URL hosted by a domain
 from the set and the fraction of URLs on each page covered by domains included
@@ -92,21 +92,6 @@ in the set --- exhibit logarithmic-like growth patterns, beginning to plateau
 well before 100 domains are reached. We assert that this demonstrates the
 aggregate behavior of the 304 domains obtained above should sufficiently cover
 the domain diversity of a ``typical'' popular web page. 
-
-By inspection after measurements were collected, two of
-the 304 domains were found to use a single, global IP address for all clients as
-opposed to performing redirection. Such behavior is 1) not interesting from a
-technical perspective in the context of this project and 2) evidently rare (only
-occurring in two of the 304 tested domains). Further, given our analysis
-methodology, the inclusion of such domains would essentially only serve to
-offset CNRE values --- which themselves are only meaningful in relative
-comparisons --- by a constant factor, having no impact on results. For this
-reason, we opt to prune these domains from the list ultimately used, reducing the
-set size to 302. It is possible that these two domains operated using a fully
-anycast model as opposed to DNS redirection \ref{anycast}. We consider the
-possibility of ammending support for single-IP anycast hosts in Section
-\ref{discussion}.
-
 
 \subsection{Per-Provider Performance Measurement}
 
@@ -123,6 +108,8 @@ to the previously described 304 domains from 10,274 of RIPE's clients. Each
 client performed DNS resolution for pings via their local DNS resolver, ensuring
 that they each targeted the web resource they would ordinarily be directed to.
 
+\subsection{Filtering}
+
 Unavoidable flux in the availability of individual, voluntarily maintained
 clients lead to some clients performing only a subset of the given
 measurements, thus missing some of the domains of interest. To be sure that this
@@ -131,4 +118,18 @@ of domain coverage --- 160 domains, just more than half of the set --- for use
 of a given client's data. We show in Section \ref{sect:cnre} the effects of domain quantity
 on measurement results. Applying this contraint reduced the size of the client
 set to 9,024 clients.  
+
+By inspection after measurements were collected, two of
+the 304 domains were found to use a single, global IP address for all clients as
+opposed to performing redirection. Such behavior is 1) not interesting from a
+technical perspective in the context of this project and 2) evidently rare (only
+occurring in two of the 304 tested domains). Further, given our analysis
+methodology, the inclusion of such domains would essentially only serve to
+offset CNRE values --- which themselves are only meaningful in relative
+comparisons --- by a constant factor, having no impact on results. For this
+reason, we opt to prune these domains from the list ultimately used, reducing the
+set size to 302. It is possible that these two domains operated using a fully
+anycast model as opposed to DNS redirection. We consider the
+possibility of ammending support for single-IP anycast hosts in Section
+\ref{anycast}.
 
